@@ -1,0 +1,143 @@
+
+
+'*******************************************************************************
+'On workbook open, refresh data
+'*******************************************************************************
+Sub Workbook_Open()
+
+    'Ensure CAL is located in correct folder path
+    Install_Path.Validate
+
+    'Setup error handling
+    On Error GoTo Alert
+
+    'Update all records
+    btn_Refresh_Data.Refresh_Data_Initialize
+
+    'Ensure user data exists in login_cred server
+    If Pull.get_uid = "" Then UserLog.Show
+
+    'Exit sub before error handling ensues
+    Exit Sub
+
+'Error handler
+Alert:
+    MsgBox "ALERT: " & vbLf & vbLf _
+        & "Enable all macros and Refresh Data before managing CAL records."
+End Sub
+
+
+'*******************************************************************************
+'When user activates a cell, ensure it is a valid range - if not, return alert
+'*******************************************************************************
+Private Sub Workbook_SheetBeforeLeftClick(ByVal Sh As Object, ByVal Target As Range, Cancel As Boolean)
+
+    'Declare variables
+    Dim iLastRow As Long
+
+    'Find last row of sheet
+    iLastRow = Range("A" & Rows.Count).End(xlUp).Row
+
+    'If active cell is out of bouds, return alert
+    If Target.Colum > 25 Or Target.Row > iLastRow Then
+        MsgBox "Entry is out of bounds - please select a valid cell to update."
+    End If
+End Sub
+
+
+'*******************************************************************************
+'On workbook Save/SaveAs call Push sub to insert/update all new records.
+'*******************************************************************************
+Sub Workbook_BeforeSave(ByVal SaveAsUI As Boolean, Cancel As Boolean)
+
+    'Delcare sub variables
+    Dim ws As Worksheet
+
+    'Show loading icon
+    Loading.Show 0
+    DoEvents
+
+    'Freeze screen updating
+    Application.ScreenUpdating = False
+
+    'Get name of active sheet on save
+    Set ws = ActiveSheet
+
+    Record_Management.Sync
+
+    'Unfreeze screen updating
+    Application.ScreenUpdating = True
+
+    'hide loading icon
+    Unload Loading
+End Sub
+
+
+'*******************************************************************************
+'When user clicks away from workbook
+'*******************************************************************************
+Private Sub Workbook_Deactivate()
+
+    'Remove right click CAL functions
+    DeleteFromRowMenu
+End Sub
+
+
+'*******************************************************************************
+'When user right clicks, add new option to menu bar
+'*******************************************************************************
+Private Sub Workbook_SheetBeforeRightClick(ByVal Sh As Object, ByVal Target As Range, Cancel As Boolean)
+
+    Dim ContextMenu As CommandBar
+
+    'Delete the controls first to avoid duplicates
+    DeleteFromRowMenu
+
+    'Set ContextMenu to the Cell menu
+    Set ContextMenu = Application.CommandBars("Row")
+
+    'If filename contains invalid characters
+    If InStr(ThisWorkbook.Name, "'") > 0 Then
+
+        'Save file without apostrophe
+        Utility.RenameWorkbook
+
+        'Turn off autosave
+        ThisWorkbook.AutoSaveOn = False
+    End If
+
+    'Add one custom button to the Cell menu
+    With ContextMenu.Controls.Add(Type:=msoControlButton, Before:=8, Temporary:=True)
+        .OnAction = "'" & ThisWorkbook.Name & "'!" & "DeleteRow"
+        .Caption = "Delete (CAL)"
+    End With
+
+    'If on programs sheet when right click row
+    If ActiveSheet.Name = oPrgms.Sht Then
+
+        'Add one custom button to the Cell menu
+        With ContextMenu.Controls.Add(Type:=msoControlButton, Before:=8, Temporary:=True)
+            .OnAction = "'" & ThisWorkbook.Name & "'!" & "ViewEligibility"
+            .Caption = "View Eligibility (CAL)"
+        End With
+    End If
+End Sub
+
+
+'*******************************************************************************
+'Delete CAL specific menubar feature
+'*******************************************************************************
+Private Sub DeleteFromRowMenu()
+
+    Dim ContextMenu As CommandBar
+
+    'If item to delete, continue on without error
+    On Error Resume Next
+
+    'Set ContextMenu to the Cell menu
+    Set ContextMenu = Application.CommandBars("Row")
+
+    'Delete custom controls with the Tag : My_Cell_Control_Tag
+    ContextMenu.Controls("Delete (CAL)").Delete
+    ContextMenu.Controls("View Eligibility (CAL)").Delete
+End Sub

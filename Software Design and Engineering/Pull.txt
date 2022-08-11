@@ -1,0 +1,1517 @@
+
+
+'*******************************************************************************
+'Query programs tab. Parameter is the user's network ID. Only pulls assigned
+'customers. Returns open recordset
+'*******************************************************************************
+Function GetPrograms(strCst As String, strFlds As String) As ADODB.Recordset
+
+    'Declare function variables
+    Dim cnn As New ADODB.Connection
+    Dim rst As New ADODB.Recordset
+
+    'Establish connection to SQL server
+    cnn.Open _
+        "DRIVER=SQL Server;SERVER=MS248CSSQL01;DATABASE=Pricing_Agreements;"
+
+    'Query program data for assigned customers
+    rst.Open "SELECT " & strFlds & " " _
+        & "FROM CAL_Programs " _
+        & "WHERE CUSTOMER IN (" & strCst & ") " _
+        & "ORDER BY CUSTOMER, PROGRAM_DESCRIPTION", cnn, adOpenStatic
+
+    'Return query results
+    Set GetPrograms = rst
+End Function
+
+
+'*******************************************************************************
+'Query deleted records. Only pulls assigned customers or records deleted
+'by user.
+'*******************************************************************************
+Function GetDelRecords(strCst As String, strDb As String) As ADODB.Recordset
+
+    'Declare function variables
+    Dim cnn As New ADODB.Connection
+    Dim rst As New ADODB.Recordset
+
+    'Establish connection to SQL server
+    cnn.Open _
+        "DRIVER=SQL Server;SERVER=MS248CSSQL01;DATABASE=Pricing_Agreements;"
+
+    'Query deleted records for assigned customers
+    rst.Open "SELECT * " _
+        & "FROM " & strDb & " " _
+        & "WHERE CUSTOMER IN (" & strCst & ")" _
+        & "OR DEL_USER = '" & GetName & "' " _
+        & "ORDER BY CUSTOMER ", cnn, adOpenForwardOnly
+
+    'Return query results
+    Set GetDelRecords = rst
+End Function
+
+
+'*******************************************************************************
+'Query programs tab. Parameter is the user's network ID. Only pulls assigned
+'customers. Returns open recordset.
+'*******************************************************************************
+Function GetExpPrograms(cst As Variant) As ADODB.Recordset
+
+    'Declare function variables
+    Dim cnn As New ADODB.Connection
+    Dim rst As New ADODB.Recordset
+
+    'Establish connection to SQL server
+    cnn.Open _
+        "DRIVER=SQL Server;SERVER=MS248CSSQL01;DATABASE=Pricing_Agreements;"
+
+    'Pull expiring contracts
+    rst.Open "SELECT PROGRAM_DESCRIPTION " _
+        & "FROM CAL_Programs " _
+        & "WHERE CUSTOMER = '" & cst & "' " _
+        & "AND VENDOR_NUM <> 1 " _
+        & "AND END_DATE < " & CLng(DateSerial(Year(Now), Month(Now) + 1, 1)) & " " _
+        & "ORDER BY PROGRAM_DESCRIPTION", cnn, adOpenForwardOnly
+
+    'Return query results
+    Set GetExpPrograms = rst
+End Function
+
+
+'*******************************************************************************
+'Query Customer Profile tab. Parameter is the user's network ID. Only pulls
+'assigned customers. Returns open recordset
+'*******************************************************************************
+Function GetCstProfile(strCst As String) As ADODB.Recordset
+
+    'Declare function variables
+    Dim cnn As New ADODB.Connection
+    Dim rst As New ADODB.Recordset
+
+    'Establish connection to SQL server
+    cnn.Open _
+        "DRIVER=SQL Server;SERVER=MS248CSSQL01;DATABASE=Pricing_Agreements;"
+
+    'Query customer profile data for assigned customers
+    rst.Open "SELECT DISTINCT " & oCst.AllFlds & " " _
+        & "FROM CAL_Customer_Profile " _
+            & "INNER JOIN " _
+            & "(SELECT MAX(PRIMARY_KEY) AS PKEY " _
+            & "FROM CAL_Customer_Profile " _
+            & "WHERE CUSTOMER IN (" & strCst & ") " _
+            & "GROUP BY CUSTOMER) AS O " _
+        & "ON PRIMARY_KEY = O.PKEY " _
+        & "ORDER BY CUSTOMER", cnn, adOpenStatic
+
+    'Return query results
+    Set GetCstProfile = rst
+End Function
+
+
+'*******************************************************************************
+'Query Deviation Loads tab. Parameter is the user's network ID. Only pulls
+'assigned customers. Returns open recordset
+'*******************************************************************************
+Function GetDevLds(strCst As String) As ADODB.Recordset
+
+    'Declare function variables
+    Dim cnn As New ADODB.Connection
+    Dim rst As New ADODB.Recordset
+
+    'Establish connection to SQL server
+    cnn.Open _
+        "DRIVER=SQL Server;SERVER=MS248CSSQL01;DATABASE=Pricing_Agreements;"
+
+    'Query deviation load data for assigned customers
+    rst.Open "SELECT DISTINCT " & oDev.AllFlds & " " _
+        & "FROM CAL_Deviation_Loads " _
+        & "WHERE CUSTOMER IN (" & strCst & ") " _
+        & "ORDER BY CUSTOMER, PROGRAM", cnn, adOpenStatic
+
+    'Return query results
+    Set GetDevLds = rst
+End Function
+
+
+'*******************************************************************************
+'Query all drop down list data. Returns multidimensional array
+'*******************************************************************************
+Function GetDropDwns() As Variant
+
+    'Declare function variables
+    Dim cnn As New ADODB.Connection
+    Dim rst As New ADODB.Recordset
+
+    'Establish connection to SQL server
+    cnn.Open _
+        "DRIVER=SQL Server;SERVER=MS248CSSQL01;DATABASE=Pricing_Agreements;"
+
+    'Query drop down option list
+    rst.Open "SELECT DROP_DOWN, COLUMN_NUM " _
+        & "FROM UL_Drop_List", cnn, adOpenForwardOnly
+
+    'Return multidimensional array of drop down list data
+    GetDropDwns = rst.GetRows
+End Function
+
+
+'*******************************************************************************
+'Query all  customer names. Parameter is user's network ID. Returns
+'array of customer names
+'*******************************************************************************
+Function GetCst(blMyCst As Boolean) As Variant
+
+    'Declare function variables
+    Dim cnn As New ADODB.Connection
+    Dim rst As New ADODB.Recordset
+    Dim strVal As String
+    Dim strOp As String
+
+    'Establish connection to SQL server
+    cnn.Open _
+        "DRIVER=SQL Server;SERVER=MS248CSSQL01;DATABASE=Pricing_Agreements;"
+
+    'Set equal character
+    If blMyCst = False Then
+        strOp = "<>"
+    Else
+        strOp = "="
+    End If
+
+    'Query all assigned customer names
+    rst.Open "SELECT CUSTOMER_NAME AS CST " _
+        & "FROM UL_ACCOUNT_ASS " _
+        & "WHERE T1_ID " & strOp & " '" & GetID & "' " _
+        & "ORDER BY CUSTOMER_NAME", cnn, adOpenForwardOnly
+
+    'Assemble string from query results
+    Do While rst.EOF = False
+        strVal = Append(strVal, ",", rst.Fields("CST").Value)
+        rst.MoveNext
+    Loop
+
+    'Return Array of assigned customer names
+    GetCst = Split(strVal, ",")
+End Function
+
+
+'*******************************************************************************
+'Query customer packet. Parameter is SQL string of customer names. Returns
+'array of customer packets.
+'*******************************************************************************
+Function GetCstPacket(strCst As String) As Variant
+
+    'Declare function variables
+    Dim cnn As New ADODB.Connection
+    Dim rst As New ADODB.Recordset
+
+    'Establish connection to SQL server
+    cnn.Open _
+        "DRIVER=SQL Server;SERVER=MS248CSSQL01;DATABASE=Pricing_Agreements;"
+
+    'Query all assigned customer names
+    rst.Open "SELECT DISTINCT UPPER(PACKET) AS PKT " _
+        & "FROM CAL_Customer_Profile " _
+        & "WHERE CUSTOMER IN (" & strCst & ")", cnn, adOpenForwardOnly
+
+    'Assemble string from query results
+    Do While rst.EOF = False
+        strVal = Append(strVal, ",", rst.Fields("PKT").Value)
+        rst.MoveNext
+    Loop
+
+    'Return Array of assigned customer names
+    If strVal <> "" Then GetCstPacket = Split(strVal, ",")
+End Function
+
+
+'*******************************************************************************
+'Query all account assignments & customer data.
+'*******************************************************************************
+Function GetAllAssignments() As ADODB.Recordset
+
+    'Declare function variables
+    Dim cnn As New ADODB.Connection
+    Dim rst As New ADODB.Recordset
+
+    'Establish connection to SQL server
+    cnn.Open _
+        "DRIVER=SQL Server;SERVER=MS248CSSQL01;DATABASE=Pricing_Agreements;"
+
+    'Query account assignment form
+    rst.Open "SELECT CUSTOMER_NAME,ALT_NAME,ASS_NOTES,TEAM_LEAD," _
+        & "TIER_1,TIER_2,PACKET,PROGRAM_COUNT,NID,GPO,GPO_TIE," _
+        & "CUST_TYPE,WEEKLY,WEEKLY_COUNT,LEAD_HOUSE,NOTES " _
+        & "FROM UL_Account_Ass", cnn, adOpenForwardOnly
+
+    'Return recordset of account assignment data
+    Set GetAllAssignments = rst
+End Function
+
+
+Function ConfirmUnassigned(customers As String) As Variant
+
+    Dim cnn As New ADODB.Connection
+    Dim rst As New ADODB.Recordset
+    Dim ado As New clsAdoConnection
+    Dim ret_val As String
+
+    cnn.Open ado.this_workbook
+
+    rst.Open "SELECT [UNASSIGNED] FROM [DropDowns (Utility)$] WHERE [UNASSIGNED] IN (" & customers & ")", cnn
+
+    ret_val = rst.GetString(, , , "|")
+
+    ConfirmUnassigned = Split(ret_val, "|")
+End Function
+
+
+'*******************************************************************************
+'Query all acount assignments given network ID(s).
+'*******************************************************************************
+Function GetAssignments(users As String) As Variant
+
+    'Declare function variables
+    Dim cnn As New ADODB.Connection
+    Dim rst As New ADODB.Recordset
+    Dim ado As New clsAdoConnection
+    Dim ret_val As Variant
+
+    'Establish connection to SQL server
+    cnn.Open _
+        "DRIVER=SQL Server;SERVER=MS248CSSQL01;DATABASE=Pricing_Agreements;"
+
+    'Query all assigned customer names
+    rst.Open "SELECT DISTINCT CUSTOMER_NAME AS CST " _
+        & "FROM UL_ACCOUNT_ASS " _
+        & "WHERE TIER_1 IN (" & users & ")", cnn, adOpenForwardOnly
+
+   ret_val = ConfirmUnassigned("'" & rst.GetString(, , , "','") & "'")
+
+    'Return Array of assigned customer names
+    GetAssignments = ret_val
+End Function
+
+
+'*******************************************************************************
+'Query T2 customer names. Parameter is user's network ID. Returns
+'array of customer names
+'*******************************************************************************
+Function GetT2() As Variant
+
+    'Declare function variables
+    Dim cnn As New ADODB.Connection
+    Dim rst As New ADODB.Recordset
+    Dim ret_val As Variant
+
+    'Establish connection to SQL server
+    cnn.Open _
+        "DRIVER=SQL Server;SERVER=MS248CSSQL01;DATABASE=Pricing_Agreements;"
+
+    'Query all assigned customer names
+    rst.Open "SELECT CUSTOMER_NAME AS CST " _
+        & "FROM UL_ACCOUNT_ASS " _
+        & "WHERE T2_ID = '" & Environ("Username") & "' " _
+        & "ORDER BY CUSTOMER_NAME", cnn, adOpenForwardOnly
+
+    'Assemble string from query results
+    If Not rst.EOF Then ret_val = ConfirmUnassigned("'" & rst.GetString(, , , "','") & "'")
+
+    'Return Array of assigned customer names
+    GetT2 = ret_val
+End Function
+
+
+'*******************************************************************************
+'Pull customer ID given customer name
+'*******************************************************************************
+Function GetCstID(cst As Variant) As Long
+
+    'Declare function variables
+    Dim cnn As New ADODB.Connection
+    Dim rst As New ADODB.Recordset
+
+    'Establish connection to SQL server
+    cnn.Open _
+        "DRIVER=SQL Server;SERVER=MS248CSSQL01;DATABASE=Pricing_Agreements;"
+
+    'Query customer ID from customer name
+    rst.Open "SELECT TOP 1 CUSTOMER_ID AS CID " _
+        & "FROM UL_Account_Ass " _
+        & "WHERE CUSTOMER_NAME = '" & cst & "'", cnn, adOpenForwardOnly
+
+    'Return query results
+    GetCstID = rst.Fields("CID").Value
+End Function
+
+
+'*******************************************************************************
+'Pull customer ID & Program ID given customer name
+'*******************************************************************************
+Function GetCstPgmID(cst As Variant, i As Integer) As String
+
+    'Declare function variables
+    Dim cnn As New ADODB.Connection
+    Dim rst As New ADODB.Recordset
+    Dim strCstID As String
+    Dim strPrgmID As String
+
+    'Establish connection to SQL server
+    cnn.Open _
+        "DRIVER=SQL Server;SERVER=MS248CSSQL01;DATABASE=Pricing_Agreements;"
+
+    'Query customer ID and program ID from customer name
+    rst.Open "SELECT TOP 1 CUSTOMER_ID AS CID," _
+        & "MAX(CAST(RIGHT(PROGRAM_ID, CHARINDEX('-', " _
+        & "REVERSE(PROGRAM_ID)) - 1) AS INT)) + " & i & " AS PID " _
+        & "FROM CAL_Programs WHERE CUSTOMER = '" & cst & "' " _
+        & "GROUP BY CUSTOMER_ID", cnn, adOpenForwardOnly
+
+    'If Program ID doesn't exist, create first program ID
+    If rst.EOF Then
+
+        'Close empty query recordset
+        rst.Close
+
+        'Query customer ID from customer name5
+        rst.Open "SELECT DISTINCT CUSTOMER_ID AS CID FROM UL_Account_Ass " _
+            & "WHERE CUSTOMER_NAME = '" & cst & "'", cnn
+
+        'Create first program ID for new customer
+        strPrgmID = "'" & rst.Fields("CID").Value & "-1'"
+
+    'If initial query returned results
+    Else
+
+        'Create string of program ID using iteritive logic
+        strPrgmID = "'" & rst.Fields("CID").Value _
+            & "-" & rst.Fields("PID").Value & "'"
+    End If
+
+    'Assign customer ID to string
+    strCstID = rst.Fields("CID").Value
+
+    'Return string of customer ID and program ID
+    GetCstPgmID = strCstID & "," & strPrgmID
+End Function
+
+
+'*******************************************************************************
+'Return multidimensional array of Excel sheet data.
+'*******************************************************************************
+Public Function GetXLArr(strSht As String, blSort As Boolean) As Variant
+
+    'Declare function variables
+    Dim rst As New ADODB.Recordset
+    Dim stCon As String
+    Dim strSort As String
+
+    'Save connection string (connection to CAL workbook)
+    stCon = "Provider=Microsoft.ACE.OLEDB.12.0;" & _
+        "Data Source=" & ThisWorkbook.FullName & ";" & _
+        "Extended Properties=""Excel 12.0 Xml;HDR=YES"";"
+
+    'Set sort as desired
+    If blSort = True Then strSort = "ORDER BY PRIMARY_KEY"
+
+    'Query file (from passthrough sheet) and return results in an open recordset
+    rst.Open "SELECT * FROM [" & strSht & "$] " & strSort, stCon, adOpenForwardOnly
+
+    'Return multidimensional array of Excel data (from passthrough sheet)
+    If Not rst.EOF Then GetXLArr = rst.GetRows
+End Function
+
+
+'*******************************************************************************
+'Return multidimensional array of Excel sheet data.
+'*******************************************************************************
+Public Function GetXLRst(strSht As String) As ADODB.Recordset
+
+    'Declare function variables
+    Dim rst As New ADODB.Recordset
+    Dim stCon As String
+    Dim strSort As String
+
+    'Save connection string (connection to CAL workbook)
+    stCon = "Provider=Microsoft.ACE.OLEDB.12.0;" & _
+        "Data Source=" & ThisWorkbook.FullName & ";" & _
+        "Extended Properties=""Excel 12.0 Xml;HDR=YES"";"
+
+    'Query file (from passthrough sheet) and return results in an open recordset
+    rst.Open "SELECT * FROM [" & strSht & "$]", stCon, adOpenForwardOnly
+
+    'Return multidimensional array of Excel data (from passthrough sheet)
+    Set GetXLRst = rst
+End Function
+
+
+'*******************************************************************************
+'Pull all accoiate names (excluding user's name).
+'*******************************************************************************
+Function GetAssName() As Variant
+
+    'Declare function variables
+    Dim cnn As New ADODB.Connection
+    Dim rst As New ADODB.Recordset
+    Dim strVal As String
+
+    'Establish connection to SQL server
+    cnn.Open _
+        "DRIVER=SQL Server;SERVER=MS248CSSQL01;DATABASE=Pricing_Agreements;"
+
+    'Query customer ID from customer name
+    rst.Open "SELECT DISTINCT TIER_1 AS ASS " _
+        & "FROM UL_Account_Ass " _
+        & "WHERE T1_ID <> '" & GetID & "' " _
+        & "ORDER BY TIER_1 ASC", cnn, adOpenForwardOnly
+
+    'Assemble string from query results
+    Do While rst.EOF = False
+        strVal = Append(strVal, "|", rst.Fields("ASS").Value)
+        rst.MoveNext
+    Loop
+
+    'Return Array of associate names
+    GetAssName = Split(strVal, "|")
+End Function
+
+
+'*******************************************************************************
+'Pull team lead for user.
+'*******************************************************************************
+Function GetLead() As String
+
+    'Declare function variables
+    Dim cnn As New ADODB.Connection
+    Dim rst As New ADODB.Recordset
+    Dim strVal As String
+
+    'Establish connection to SQL server
+    cnn.Open _
+        "DRIVER=SQL Server;SERVER=MS248CSSQL01;DATABASE=Pricing_Agreements;"
+
+    'Query customer ID from customer name
+    rst.Open "SELECT DISTINCT TEAM_LEAD " _
+        & "FROM UL_Org AS T1 " _
+        & "INNER JOIN Login_Cred AS T2 " _
+        & "ON T1.ASSOCIATE = T2.NAME " _
+        & "AND T2.NET_ID = '" & GetID & "' ", cnn, adOpenForwardOnly
+
+    'Return Array of associate names
+    If Not rst.EOF Then GetLead = rst.Fields("TEAM_LEAD").Value
+End Function
+
+
+
+'*******************************************************************************
+'Pull all accoiate names (excluding user's name).
+'*******************************************************************************
+Function GetGPO() As Variant
+
+    'Declare function variables
+    Dim ado As New clsAdoConnection
+    Dim cnn As New ADODB.Connection
+    Dim rst As New ADODB.Recordset
+    Dim ret_val As String
+
+    cnn.Open ado.this_workbook
+    rst.Open "SELECT [ASSIGNED] FROM [DropDowns (Utility)$]", cnn
+
+    If Not rst.EOF Then
+
+        ret_val = "'" & rst.GetString(, , , "','") & "'"
+        cnn.Close
+        Set cnn = Nothing
+
+        'Establish connection to SQL server
+        cnn.Open _
+            "DRIVER=SQL Server;SERVER=MS248CSSQL01;DATABASE=Pricing_Agreements;"
+
+        'Query customer ID from customer name
+        rst.Open "SELECT CUSTOMER_NAME AS CST " _
+            & "FROM UL_Account_Ass " _
+            & "WHERE CUSTOMER_NAME IN (" & ret_val & ") " _
+            & "AND GPO = 'Y' ", cnn, adOpenForwardOnly
+
+        If Not rst.EOF Then
+            ret_val = rst.GetString(, , , "|")
+        Else
+            ret_val = ""
+        End If
+    End If
+
+    'Return 2d array from recordset value
+    If ret_val <> "" Then GetGPO = Split(ret_val, "|")
+End Function
+
+
+'*******************************************************************************
+'Pull all accoiate names (excluding user's name).
+'*******************************************************************************
+Function GetAssID(strNm As String) As Variant
+
+    'Declare function variables
+    Dim cnn As New ADODB.Connection
+    Dim rst As New ADODB.Recordset
+    Dim strVal As String
+
+    'Establish connection to SQL server
+    cnn.Open _
+        "DRIVER=SQL Server;SERVER=MS248CSSQL01;DATABASE=Pricing_Agreements;"
+
+    'Query customer ID from customer name
+    rst.Open "SELECT DISTINCT T1_ID AS ID " _
+        & "FROM UL_Account_Ass " _
+        & "WHERE TIER_1 IN (" & strNm & ")", cnn, adOpenForwardOnly
+
+    'Assemble string from query results
+    Do While rst.EOF = False
+        strVal = Append(strVal, "|", rst.Fields("ID").Value)
+        rst.MoveNext
+    Loop
+
+    'Return Array of associate names
+    GetAssID = Split(strVal, "|")
+End Function
+
+
+'*******************************************************************************
+'Return all OpCo sites given list of Packets.
+'*******************************************************************************
+Function GetOpcos(strPacket As String) As Variant
+
+    'Declare function variables
+    Dim cnn As New ADODB.Connection
+    Dim rst As New ADODB.Recordset
+    Dim iErr As Integer
+    Dim strUid As String
+    Dim strPwd As String
+
+    'Get username and password
+    strUid = get_uid
+    strPwd = get_pwd
+
+    'Connect to OpCo
+    On Error GoTo OpErr
+    cnn.Open "DSN=AS240A;UID=" & strUid & ";PASSWORD=" & strPwd & ";"
+    On Error GoTo 0
+
+    'Query OpCo list for each packet
+    rst.Open "SELECT DISTINCT TRIM(DVPKGS) AS PCKT, TRIM(DVT500) AS OP " _
+        & "FROM SCDBFP10.PMDPDVRF " _
+        & "INNER JOIN (" _
+            & "SELECT DVPKGS AS PACKET, MAX(LENGTH(TRIM(DVT500))) AS LEN " _
+            & "FROM SCDBFP10.PMDPDVRF " _
+            & "WHERE TRIM(DVPKGS) IN (" & strPacket & ") " _
+            & "GROUP BY DVPKGS) " _
+        & "ON DVPKGS = PACKET AND LENGTH(TRIM(DVT500)) = LEN ", _
+        cnn, adOpenForwardOnly
+
+    'Return multidimensional of packet data
+    GetOpcos = rst.GetRows
+
+    'Exit Function before error handler
+    Exit Function
+
+'Could not connect to OpCo
+OpErr:
+
+    'If catastrophic error
+    If InStr(Err.Description, "Catastrophic") > 0 Then
+        MsgBox "OBDC overload. " & vbLf & vbLf _
+            & "Please close all open instances of Excel and try again."
+
+    'If invalid password
+    ElseIf iErr < 2 Then
+
+        'Prompt user to enter SUS credentials
+        UserLog.Show
+
+        'Get updated credentials from server
+        strUid = get_uid
+        strPwd = get_pwd
+
+        'Iterate login attempt counter and resume login
+        iErr = iErr + 1
+        Resume
+
+    'All login attempts unsuccessful
+    Else
+        MsgBox "Could not reach OpCo. Please validate you have access to as240a"
+    End If
+End Function
+
+
+'*******************************************************************************
+'Return all overlapping customers/shp tos give two vendor agmts & OpCo
+'*******************************************************************************
+Function GetVaOvCst(str1 As String, str2 As String, strOp As String) _
+    As ADODB.Recordset
+
+    'Declare function variables
+    Dim cnn As New ADODB.Connection
+    Dim rst As New ADODB.Recordset
+    Dim iErr As Integer
+    Dim strUid As String
+    Dim strPwd As String
+
+    'Get username and password
+    strUid = get_uid
+    strPwd = get_pwd
+
+    'Connect to OpCo
+    On Error GoTo OpErr
+    cnn.Open "DSN=AS" & Left(strOp, 3) & "A;UID=" & strUid & ";PASSWORD=" & strPwd & ";"
+    On Error GoTo 0
+
+    'VA Query overlapping customer
+    rst.Open "SELECT DISTINCT " _
+        & "TRIM(T2.QWPCSC) || ' ' || TRIM(T2.QWPCSP), TRIM(T2.QWCUNO) " _
+        & "FROM (" _
+            & "SELECT QWCUNO, COUNT(QWCUNO) " _
+            & "FROM SCDBFP10.PMPZQWPF " _
+            & "WHERE QWVAGN IN (" & str1 & "," & str2 & ") " _
+            & "GROUP BY QWCUNO " _
+            & "HAVING COUNT(QWCUNO) > 1) AS T1 " _
+        & "LEFT JOIN (" _
+            & "SELECT QWPCSC, QWPCSP, QWCUNO " _
+            & "FROM SCDBFP10.PMPZQWPF " _
+            & "WHERE QWVAGN IN (" & str1 & "," & str2 & ")) AS T2 " _
+        & "ON T1.QWCUNO = T2.QWCUNO", cnn, adOpenForwardOnly
+
+    'Return multidimensional of packet data
+    Set GetVaOvCst = rst
+
+    'Exit Function before error handler
+    Exit Function
+
+'Could not connect to OpCo
+OpErr:
+
+    'If catastrophic error
+    If InStr(Err.Description, "Catastrophic") > 0 Then
+        MsgBox "OBDC overload. " & vbLf & vbLf _
+            & "Please close all open instances of Excel and try again."
+
+    'If invalid password
+    ElseIf iErr < 2 Then
+
+        'Prompt user to enter SUS credentials
+        UserLog.Show
+
+        'Get updated credentials from server
+        strUid = get_uid
+        strPwd = get_pwd
+
+        'Iterate login attempt counter and resume login
+        iErr = iErr + 1
+        Resume
+
+    'All login attempts unsuccessful
+    Else
+        MsgBox "Could not reach OpCo. Please validate you have access to as240a"
+    End If
+End Function
+
+
+'*******************************************************************************
+'Return all overlapping item given two customer agmts & OpCo
+'*******************************************************************************
+Function GetVaOvItm(str1 As String, str2 As String, strOp As String) _
+    As ADODB.Recordset
+
+    'Declare function variables
+    Dim cnn As New ADODB.Connection
+    Dim rst As New ADODB.Recordset
+    Dim iErr As Integer
+    Dim strUid As String
+    Dim strPwd As String
+
+    'Get username and password
+    strUid = get_uid
+    strPwd = get_pwd
+
+    'Connect to OpCo
+    On Error GoTo OpErr
+    cnn.Open "DSN=AS" & strOp & "A;UID=" & strUid & ";PASSWORD=" & strPwd & ";"
+    On Error GoTo 0
+
+    'Pull overlapping items
+    rst.Open "SELECT TRIM(QBITEM) " _
+        & "FROM SCDBFP10.PMPZQBPF " _
+        & "WHERE QBVAGN IN (" & str1 & "," & str2 & ") " _
+        & "GROUP BY QBITEM " _
+        & "HAVING COUNT(QBITEM) > 1", cnn, adOpenForwardOnly
+
+    'Return multidimensional of packet data
+    Set GetVaOvItm = rst
+
+    'Exit Function before error handler
+    Exit Function
+
+'Could not connect to OpCo
+OpErr:
+
+    'If catastrophic error
+    If InStr(Err.Description, "Catastrophic") > 0 Then
+        MsgBox "OBDC overload. " & vbLf & vbLf _
+            & "Please close all open instances of Excel and try again."
+
+    'If invalid password
+    ElseIf iErr < 2 Then
+
+        'Prompt user to enter SUS credentials
+        UserLog.Show
+
+        'Get updated credentials from server
+        strUid = get_uid
+        strPwd = get_pwd
+
+        'Iterate login attempt counter and resume login
+        iErr = iErr + 1
+        Resume
+
+    'All login attempts unsuccessful
+    Else
+        MsgBox "Could not reach OpCo. Please validate you have access to as240a"
+    End If
+End Function
+
+
+'*******************************************************************************
+'Return all overlapping customers/shp tos give two customer agmts & OpCo
+'*******************************************************************************
+Function GetCaOvCst(str1 As String, str2 As String, strOp As String) _
+    As ADODB.Recordset
+
+    'Declare function variables
+    Dim cnn As New ADODB.Connection
+    Dim rst As New ADODB.Recordset
+    Dim iErr As Integer
+    Dim strUid As String
+    Dim strPwd As String
+
+    'Get username and password
+    strUid = get_uid
+    strPwd = get_pwd
+
+    'Connect to OpCo
+    On Error GoTo OpErr
+    cnn.Open "DSN=AS" & strOp & "A;UID=" & strUid & ";PASSWORD=" & strPwd & ";"
+    On Error GoTo 0
+
+    'CA Query overlapping customer
+    rst.Open "SELECT DISTINCT " _
+        & "TRIM(T2.QYPCSC) || ' ' || TRIM(T2.QYPCSP), TRIM(T2.QYCUNO) " _
+        & "FROM (" _
+            & "SELECT QYCUNO, COUNT(QYCUNO) " _
+            & "FROM SCDBFP10.PMPZQYPF " _
+            & "WHERE QYCANO IN (" & str1 & "," & str2 & ") " _
+            & "GROUP BY QYCUNO " _
+            & "HAVING COUNT(QYCUNO) > 1) AS T1 " _
+        & "LEFT JOIN (" _
+            & "SELECT QYPCSC, QYPCSP, QYCUNO " _
+            & "FROM SCDBFP10.PMPZQYPF " _
+            & "WHERE QYCANO IN (" & str1 & "," & str2 & ")) AS T2 " _
+        & "ON T1.QYCUNO = T2.QYCUNO", cnn, adOpenForwardOnly
+
+    'Return multidimensional of packet data
+    Set GetCaOvCst = rst
+
+    'Exit Function before error handler
+    Exit Function
+
+'Could not connect to OpCo
+OpErr:
+
+    'If catastrophic error
+    If InStr(Err.Description, "Catastrophic") > 0 Then
+        MsgBox "OBDC overload. " & vbLf & vbLf _
+            & "Please close all open instances of Excel and try again."
+
+    'If invalid password
+    ElseIf iErr < 2 Then
+
+        'Prompt user to enter SUS credentials
+        UserLog.Show
+
+        'Get updated credentials from server
+        strUid = get_uid
+        strPwd = get_pwd
+
+        'Iterate login attempt counter and resume login
+        iErr = iErr + 1
+        Resume
+
+    'All login attempts unsuccessful
+    Else
+        MsgBox "Could not reach OpCo. Please validate you have access to as240a"
+    End If
+End Function
+
+
+'*******************************************************************************
+'Return all overlapping item given two customer agmts & OpCo
+'*******************************************************************************
+Function GetCaOvItm(str1 As String, str2 As String, strOp As String) _
+    As ADODB.Recordset
+
+    'Declare function variables
+    Dim cnn As New ADODB.Connection
+    Dim rst As New ADODB.Recordset
+    Dim iErr As Integer
+    Dim strUid As String
+    Dim strPwd As String
+
+    'Get username and password
+    strUid = get_uid
+    strPwd = get_pwd
+
+    'Connect to OpCo
+    On Error GoTo OpErr
+    cnn.Open "DSN=AS" & strOp & "A;UID=" & strUid & ";PASSWORD=" & strPwd & ";"
+    On Error GoTo 0
+
+    'Pull overlapping items
+    rst.Open "SELECT TRIM(QXITEM) " _
+        & "FROM SCDBFP10.PMPZQXPF " _
+        & "WHERE QXCANO IN (" & str1 & "," & str2 & ") " _
+        & "GROUP BY QXITEM " _
+        & "HAVING COUNT(QXITEM) > 1", cnn, adOpenForwardOnly
+
+    'Return multidimensional of packet data
+    Set GetCaOvItm = rst
+
+    'Exit Function before error handler
+    Exit Function
+
+'Could not connect to OpCo
+OpErr:
+
+    'If catastrophic error
+    If InStr(Err.Description, "Catastrophic") > 0 Then
+        MsgBox "OBDC overload. " & vbLf & vbLf _
+            & "Please close all open instances of Excel and try again."
+
+    'If invalid password
+    ElseIf iErr < 2 Then
+
+        'Prompt user to enter SUS credentials
+        UserLog.Show
+
+        'Get updated credentials from server
+        strUid = get_uid
+        strPwd = get_pwd
+
+        'Iterate login attempt counter and resume login
+        iErr = iErr + 1
+        Resume
+
+    'All login attempts unsuccessful
+    Else
+        MsgBox "Could not reach OpCo. Please validate you have access to as240a"
+    End If
+End Function
+
+
+'*******************************************************************************
+'Return recordset of all items that are coded to strMPC
+'*******************************************************************************
+Function GetSUPCxMPC(strMPC As String) As ADODB.Recordset
+
+    'Declare function variables
+    Dim cnn As New ADODB.Connection
+    Dim rst As New ADODB.Recordset
+    Dim iErr As Integer
+    Dim strUid As String
+    Dim strPwd As String
+
+    'Get username and password
+    strUid = get_uid
+    strPwd = get_pwd
+
+    'Connect to OpCo
+    On Error GoTo OpErr
+    cnn.Open "DSN=AS240A;UID=" & strUid & ";PASSWORD=" & strPwd & ";"
+    On Error GoTo 0
+
+    'Turn off connection timeout
+    cnn.CommandTimeout = 0
+
+    rst.Open "SELECT DISTINCT TRIM(JFITEM), " _
+        & "TRIM(JFPACK) || '/' || TRIM(JFITSZ), " _
+        & "TRIM(JFBRND), TRIM(JFITDS), TRIM(JFMNPC), JFEUPC, " _
+        & "CASE WHEN JFITST = 'A' THEN 'ACTIVE' ELSE 'INACTIVE' END " _
+        & "FROM SCDBFP10.USIAJFPF " _
+        & "WHERE TRIM(JFMNPC) IN (" & strMPC & ")", cnn, adOpenForwardOnly
+
+    'Return multidimensional of packet data
+    Set GetSUPCxMPC = rst
+
+    'Exit Function before error handler
+    Exit Function
+
+'Could not connect to OpCo
+OpErr:
+
+    'If catastrophic error
+    If InStr(Err.Description, "Catastrophic") > 0 Then
+        MsgBox "OBDC overload. " & vbLf & vbLf _
+            & "Please close all open instances of Excel and try again."
+
+    'If invalid password
+    ElseIf iErr < 2 Then
+
+        'Prompt user to enter SUS credentials
+        UserLog.Show
+
+        'Get updated credentials from server
+        strUid = get_uid
+        strPwd = get_pwd
+
+        'Iterate login attempt counter and resume login
+        iErr = iErr + 1
+        Resume
+
+    'All login attempts unsuccessful
+    Else
+        MsgBox "Could not reach OpCo. Please validate you have access to as240a"
+    End If
+End Function
+
+
+'*******************************************************************************
+'Return recordset of all items that are coded to strMPC
+'*******************************************************************************
+Function GetSUPCxGTIN(strGTIN As String) As ADODB.Recordset
+
+    'Declare function variables
+    Dim cnn As New ADODB.Connection
+    Dim rst As New ADODB.Recordset
+    Dim iErr As Integer
+    Dim strUid As String
+    Dim strPwd As String
+
+    'Get username and password
+    strUid = get_uid
+    strPwd = get_pwd
+
+    'Connect to OpCo
+    On Error GoTo OpErr
+    cnn.Open "DSN=AS240A;UID=" & strUid & ";PASSWORD=" & strPwd & ";"
+    On Error GoTo 0
+
+    'Turn off connection timeout
+    cnn.CommandTimeout = 0
+
+    'Query for SUPC using GTIN
+    rst.Open "SELECT DISTINCT TRIM(JFITEM), " _
+        & "TRIM(JFPACK) || '/' || TRIM(JFITSZ), " _
+        & "TRIM(JFBRND), TRIM(JFITDS), TRIM(JFMNPC), JFEUPC, " _
+        & "CASE WHEN JFITST = 'A' THEN 'ACTIVE' ELSE 'INACTIVE' END " _
+        & "FROM SCDBFP10.USIAJFPF " _
+        & "WHERE JFEUPC IN (" & strGTIN & ")", cnn, adOpenForwardOnly
+
+    'Return multidimensional of packet data
+    Set GetSUPCxGTIN = rst
+
+    'Exit Function before error handler
+    Exit Function
+
+'Could not connect to OpCo
+OpErr:
+
+    'If catastrophic error
+    If InStr(Err.Description, "Catastrophic") > 0 Then
+        MsgBox "OBDC overload. " & vbLf & vbLf _
+            & "Please close all open instances of Excel and try again."
+
+    'If invalid password
+    ElseIf iErr < 2 Then
+
+        'Prompt user to enter SUS credentials
+        UserLog.Show
+
+        'Get updated credentials from server
+        strUid = get_uid
+        strPwd = get_pwd
+
+        'Iterate login attempt counter and resume login
+        iErr = iErr + 1
+        Resume
+
+    'All login attempts unsuccessful
+    Else
+        MsgBox "Could not reach OpCo. Please validate you have access to as240a"
+    End If
+End Function
+
+
+'*******************************************************************************
+'Get associate SUS password
+'*******************************************************************************
+Function get_pwd() As String
+
+    'Declare function variables
+    Dim cnn As New ADODB.Connection
+    Dim rst As New ADODB.Recordset
+    Dim i       As Integer
+    Dim StrDec  As String
+    Dim strPwd  As String
+    Dim strKey  As String
+
+    'Establish connection to SQL server
+    cnn.Open _
+        "DRIVER=SQL Server;SERVER=MS248CSSQL01;DATABASE=Pricing_Agreements;"
+
+    'Query uid & password
+    rst.Open "SELECT SUS_PWD, CRED_ID " _
+        & "FROM Login_Cred " _
+        & "WHERE NET_ID = '" & GetID & "'", cnn, adOpenForwardOnly
+
+    'If records were successfully queried
+    If Not rst.EOF Then
+
+        'save value to string
+        strPwd = rst.Fields("SUS_PWD").Value
+        strKey = rst.Fields("CRED_ID").Value
+
+        'Loop through each character in password
+        For i = 1 To Len(strPwd)
+
+            'Decrypt character of password
+            StrDec = StrDec & Chr(Asc(Mid(strPwd, i, 1)) - Mid(strKey, i, 1))
+        Next
+
+        'Return decryted SUS password
+        get_pwd = StrDec
+    End If
+End Function
+
+
+'*******************************************************************************
+'Get associate SUS username
+'*******************************************************************************
+Function get_uid() As String
+
+    'Declare function variables
+    Dim cnn As New ADODB.Connection
+    Dim rst As New ADODB.Recordset
+
+    'Establish connection to SQL server
+    cnn.Open _
+        "DRIVER=SQL Server;SERVER=MS248CSSQL01;DATABASE=Pricing_Agreements;"
+
+    'Query uid & password
+    rst.Open "SELECT SUS_ID AS ID " _
+        & "FROM Login_Cred " _
+        & "WHERE NET_ID = '" & GetID & "'", cnn, adOpenForwardOnly
+
+    'If records were successfully queried return SUS ID
+    If Not rst.EOF Then get_uid = rst.Fields("ID").Value
+End Function
+
+'*******************************************************************************
+'Generate a report which validates all CAs created by user *today have
+'been downloaded.
+'*******************************************************************************
+Function GetDownloadErrCA() As ADODB.Recordset
+
+    'Declare function variables
+    Dim cnn As New ADODB.Connection
+    Dim rst As New ADODB.Recordset
+    Dim iErr As Integer
+    Dim strUid As String
+    Dim strPwd As String
+    Dim strDt As String
+
+    'Get username and password
+    strUid = get_uid
+    strPwd = get_pwd
+
+    'Get todays date in SUS format
+    strDt = Format(Now(), "yyyymmdd")
+
+    'Connect to OpCo
+    On Error GoTo OpErr
+    cnn.Open "DSN=AS240A;UID=" & strUid & ";PASSWORD=" & strPwd & ";"
+    On Error GoTo 0
+    On Error GoTo -1
+
+    'Query all agreements created today with download errors
+    rst.Open "SELECT DISTINCT 'CA', NHCANO, NHCADC, NHCASD, NHCAED, NHEADT, " _
+        & "CASE " _
+            & "WHEN DVCPTY IS NULL THEN 'AGREEMENT NOT ADDED TO PACKET' " _
+            & "WHEN DVLTDT = 0 THEN 'AGREEMENT NOT DISTRIBUTED' " _
+            & "ELSE 'NO ERROR' " _
+        & "END " _
+        & "FROM SCDBFP10.PMPVNHPF " _
+        & "LEFT JOIN SCDBFP10.PMDPDVRF " _
+        & "ON NHCANO = DVCPM9 AND 'CA ' = DVCPTY " _
+        & "WHERE TRIM(NHEAID) = '" & strUid & "' " _
+        & "AND NHEADT = " & strDt & " " _
+        & "AND NHCVAN = 0", cnn, adOpenForwardOnly
+
+    'If records were found, return whole recordset
+    Set GetDownloadErrCA = rst
+
+    'Exit Function before error handler
+    Exit Function
+
+'Could not connect to OpCo
+OpErr:
+
+    'If catastrophic error
+    If InStr(Err.Description, "Catastrophic") > 0 Then
+        MsgBox "OBDC overload. " & vbLf & vbLf _
+            & "Please close all open instances of Excel and try again."
+
+    'If invalid password
+    ElseIf iErr < 2 Then
+
+        'Prompt user to enter SUS credentials
+        UserLog.Show
+
+        'Get updated credentials from server
+        strUid = get_uid
+        strPwd = get_pwd
+
+        'Iterate login attempt counter and resume login
+        iErr = iErr + 1
+        Resume
+
+    'All login attempts unsuccessful
+    Else
+        MsgBox "Could not reach OpCo. Please validate you have access to as240a"
+    End If
+End Function
+
+
+'*******************************************************************************
+'Generate a report which validates all VAs created by user *today have
+'been downloaded.
+'*******************************************************************************
+Function GetDownloadErrVA() As ADODB.Recordset
+
+    'Declare function variables
+    Dim cnn As New ADODB.Connection
+    Dim rst As New ADODB.Recordset
+    Dim iErr As Integer
+    Dim strUid As String
+    Dim strPwd As String
+    Dim strDt As String
+
+    'Get username and password
+    strUid = get_uid
+    strPwd = get_pwd
+
+    'Get todays date in SUS format
+    strDt = Format(Now(), "yyyymmdd")
+
+    'Connect to OpCo
+    On Error GoTo OpErr
+    cnn.Open "DSN=AS240A;UID=" & strUid & ";PASSWORD=" & strPwd & ";"
+    On Error GoTo 0
+    On Error GoTo -1
+
+    'Query all agreements created today with download errors
+    rst.Open "SELECT DISTINCT 'VA', M7VAGN, M7VAGD, M7VASD, M7VAED, M7EADT, " _
+        & "CASE " _
+            & "WHEN DVCPTY IS NULL THEN 'AGREEMENT NOT ADDED TO PACKET' " _
+            & "WHEN DVLTDT = 0 THEN 'AGREEMENT NOT DISTRIBUTED' " _
+            & "ELSE 'NO ERROR' " _
+        & "END " _
+        & "FROM SCDBFP10.PMVHM7PF " _
+        & "LEFT JOIN SCDBFP10.PMDPDVRF " _
+        & "ON M7VAGN = DVCPM9 AND 'VA ' = DVCPTY " _
+        & "WHERE TRIM(M7EAID) = '" & strUid & "' " _
+        & "AND M7EADT = " & strDt, cnn, adOpenForwardOnly
+
+    'If records were found, return whole recordset
+    Set GetDownloadErrVA = rst
+
+    'Exit Function before error handler
+    Exit Function
+
+'Could not connect to OpCo
+OpErr:
+
+    'If catastrophic error
+    If InStr(Err.Description, "Catastrophic") > 0 Then
+        MsgBox "OBDC overload. " & vbLf & vbLf _
+            & "Please close all open instances of Excel and try again."
+
+    'If invalid password
+    ElseIf iErr < 2 Then
+
+        'Prompt user to enter SUS credentials
+        UserLog.Show
+
+        'Get updated credentials from server
+        strUid = get_uid
+        strPwd = get_pwd
+
+        'Iterate login attempt counter and resume login
+        iErr = iErr + 1
+        Resume
+
+    'All login attempts unsuccessful
+    Else
+        MsgBox "Could not reach OpCo. Please validate you have access to as240a"
+    End If
+End Function
+
+
+'*******************************************************************************
+'Generate a dictionary of key:= excel row number & Item:= array of customer
+'eligibility.
+'*******************************************************************************
+Function GetEligibility(strVA As String, strCA As String) As ADODB.Recordset
+
+    'Declare function variables
+    Dim cnn As New ADODB.Connection
+    Dim rst As New ADODB.Recordset
+    Dim iErr As Integer
+    Dim strUid As String
+    Dim strPwd As String
+
+    'Get username and password
+    strUid = get_uid
+    strPwd = get_pwd
+
+    'Connect to OpCo
+    On Error GoTo OpErr
+    cnn.Open "DSN=AS240A;UID=" & strUid & ";PASSWORD=" & strPwd & ";"
+    On Error GoTo 0
+    On Error GoTo -1
+
+    'Query all customer eligibility for list of agreements
+    rst.Open "SELECT DISTINCT TRIM(AZPCIE), AZPCSC, TRIM(AZPCSP), " _
+        & "CASE WHEN JNPTDS IS NULL THEN " _
+            & "TRIM(JUGRPD) " _
+        & "ELSE " _
+            & "TRIM(JNPTDS) " _
+        & "END " _
+        & "FROM SCDBFP10.USCNAZPF " _
+        & "LEFT JOIN SCDBFP10.USCAJNPF ON AZPCSP = JNPCNO " _
+        & "LEFT JOIN SCDBFP10.USCLJUPF ON AZPCSP = JUCEEN " _
+        & "LEFT JOIN SCDBFP10.PMVHM7PF " _
+        & "ON AZCEEN = M7VAGN AND AZCEAI = 'VA ' " _
+        & "AND (AZEFED = M7VAED OR AZPCIE = 'E') " _
+        & "LEFT JOIN SCDBFP10.PMPVNHPF " _
+        & "ON AZCEEN = NHCANO AND AZCEAI = 'CA ' " _
+        & "AND (AZEFED = NHCAED OR AZPCIE = 'E') " _
+        & "WHERE (M7VAGN <> 0 OR NHCANO <> 0) " _
+        & "AND ((AZCEEN IN (" & strCA & ") AND AZCEAI = 'CA ') " _
+        & "OR (AZCEEN IN (" & strVA & ") AND AZCEAI = 'VA '))", cnn, adOpenForwardOnly
+
+    'Return dictionary
+    Set GetEligibility = rst
+
+    'Exit function before error handler
+    Exit Function
+
+'Could not connect to OpCo
+OpErr:
+
+    'If catastrophic error
+    If InStr(Err.Description, "Catastrophic") > 0 Then
+        MsgBox "OBDC overload. " & vbLf & vbLf _
+            & "Please close all open instances of Excel and try again."
+
+    'If invalid password
+    ElseIf iErr < 2 Then
+
+        'Prompt user to enter SUS credentials
+        UserLog.Show
+
+        'Get updated credentials from server
+        strUid = get_uid
+        strPwd = get_pwd
+
+        'Iterate login attempt counter and resume login
+        iErr = iErr + 1
+        Resume
+
+    'All login attempts unsuccessful
+    Else
+        MsgBox "Could not reach OpCo. Please validate you have access to as240a"
+    End If
+End Function
+
+
+'*******************************************************************************
+'Generate a dictionary of key:= excel row number & Item:= array of customer
+'eligibility.
+'*******************************************************************************
+Function GetSUSName(strUid, strPwd) As String
+
+    'Declare function variables
+    Dim cnn As New ADODB.Connection
+    Dim rst As New ADODB.Recordset
+    Dim iErr As Integer
+
+    'Connect to OpCo
+    On Error GoTo OpErr
+    cnn.Open "DSN=AS240A;UID=" & strUid & ";PASSWORD=" & strPwd & ";"
+    On Error GoTo 0
+    On Error GoTo -1
+
+    'Query all customer eligibility for list of agreements
+    rst.Open "SELECT TRIM(O4FRST) || ' ' || TRIM(O4LAST) AS NAME " _
+        & "FROM SCDBFP10.SYDBO4PF " _
+        & "WHERE O4USER = '" & UCase(strUid) & "'", cnn, adOpenForwardOnly
+
+    'Return dictionary
+    GetSUSName = rst.Fields("NAME").Value
+
+    'Exit function before error handler
+    Exit Function
+
+'Could not connect to OpCo
+OpErr:
+
+    'If catastrophic error
+    If InStr(Err.Description, "Catastrophic") > 0 Then
+        MsgBox "OBDC overload. " & vbLf & vbLf _
+            & "Please close all open instances of Excel and try again."
+
+    'All login attempts unsuccessful
+    Else
+        MsgBox "Password invalid or you are locked out of OpCo. Please try again."
+    End If
+End Function
+
+
+'*******************************************************************************
+'Generate a dictionary of key:= excel row number & Item:= array of customer
+'eligibility.
+'*******************************************************************************
+Function GetMatrix(strVA As String, strCA As String, _
+    dct As Scripting.Dictionary) As Scripting.Dictionary
+
+    'Declare function variables
+    Dim cnn As New ADODB.Connection
+    Dim rst As New ADODB.Recordset
+    Dim dctTmp As New Scripting.Dictionary
+    Dim iErr As Integer
+    Dim strUid As String
+    Dim strPwd As String
+    Dim strCust As String
+    Dim strAgmt As String
+
+    'Get username and password
+    strUid = get_uid
+    strPwd = get_pwd
+
+    'Connect to OpCo
+    On Error GoTo OpErr
+    cnn.Open "DSN=AS240A;UID=" & strUid & ";PASSWORD=" & strPwd & ";"
+    On Error GoTo 0
+    On Error GoTo -1
+
+    'Query all customer eligibility for list of agreements
+    rst.Open "SELECT CAST(AZCEEN AS INT) AS AGMT, " _
+        & "CASE WHEN JUGRPD IS NOT NULL THEN " _
+            & "TRIM(JUGRPD) || '" & vbLf & "(' || TRIM(AZPCSP) || ')' " _
+        & "WHEN JNPTDS IS NOT NULL THEN " _
+            & "TRIM(JNPTDS) || '" & vbLf & "(' || TRIM(AZPCSP) || ')' " _
+        & "ELSE " _
+            & "'UNNAMED" & vbLf & "(' || TRIM(AZPCSP) || ')' " _
+        & "END AS CST " _
+        & "FROM SCDBFP10.USCNAZPF " _
+        & "LEFT JOIN SCDBFP10.USCAJNPF ON AZPCSP = JNPCNO " _
+        & "LEFT JOIN SCDBFP10.USCLJUPF ON AZPCSP = JUCEEN " _
+        & "LEFT JOIN SCDBFP10.PMVHM7PF " _
+        & "ON AZCEEN = M7VAGN AND AZCEAI = 'VA ' " _
+        & "AND (AZEFED = M7VAED OR AZPCIE = 'E') " _
+        & "LEFT JOIN SCDBFP10.PMPVNHPF " _
+        & "ON AZCEEN = NHCANO AND AZCEAI = 'CA ' " _
+        & "AND (AZEFED = NHCAED OR AZPCIE = 'E') " _
+        & "WHERE (M7VAGN <> 0 OR NHCANO <> 0) " _
+        & "AND ((AZCEEN IN (" & strCA & ") AND AZCEAI = 'CA ') " _
+        & "OR (AZCEEN IN (" & strVA & ") AND AZCEAI = 'VA ')) " _
+        & "ORDER BY CST", cnn, adOpenForwardOnly
+
+    'Loop through records and add to dictionary
+    Do While Not rst.EOF
+
+        'Get values from recordset line
+        strCust = rst.Fields("CST").Value
+        strAgmt = rst.Fields("AGMT").Value
+
+        'Add items to dictionary with customer name as Key and all eligible agreements as comma delimited string
+        dctTmp(strCust) = Append(dctTmp(strCust), "|", dct(strAgmt))
+
+        'Iterate recordste
+        rst.MoveNext
+    Loop
+
+    'Return dictionary
+    Set GetMatrix = dctTmp
+
+    'Exit function before error handler
+    Exit Function
+
+'Could not connect to OpCo
+OpErr:
+
+    'If catastrophic error
+    If InStr(Err.Description, "Catastrophic") > 0 Then
+        MsgBox "OBDC overload. " & vbLf & vbLf _
+            & "Please close all open instances of Excel and try again."
+
+    'If invalid password
+    ElseIf iErr < 2 Then
+
+        'Prompt user to enter SUS credentials
+        UserLog.Show
+
+        'Get updated credentials from server
+        strUid = get_uid
+        strPwd = get_pwd
+
+        'Iterate login attempt counter and resume login
+        iErr = iErr + 1
+        Resume
+
+    'All login attempts unsuccessful
+    Else
+        MsgBox "Could not reach OpCo. Please validate you have access to as240a"
+    End If
+End Function
+
+
+Function SelectAll(strDb As String) As ADODB.Recordset
+
+    Dim cnn As New ADODB.Connection
+    Dim rst As New ADODB.Recordset
+
+    cnn.Open "DRIVER=SQL Server;SERVER=MS248CSSQL01;DATABASE=Pricing_Agreements;"
+
+    rst.Open "SELECT * FROM " & strDb, cnn
+
+    Set SelectAll = rst
+End Function
+
+
+'*******************************************************************************
+'Return multidimensional array of metrics percentages.
+'*******************************************************************************
+Public Function GetMetricsPct() As Variant
+
+    'Declare function variables
+    Dim cnn As New ADODB.Connection
+    Dim rst As New ADODB.Recordset
+
+    'Establish connection to SQL server
+    cnn.Open _
+        "DRIVER=SQL Server;SERVER=MS248CSSQL01;DATABASE=Pricing_Agreements;"
+
+    'Query to see if the user name already exists in the table.
+        rst.Open "SELECT * " _
+        & "FROM PR_MetricsPct ", cnn
+
+    'Return true if recordset is not empty
+    GetMetricsPct = rst.GetRows
+End Function

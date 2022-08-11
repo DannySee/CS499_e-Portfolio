@@ -1,0 +1,1219 @@
+
+'Declare private module constants
+Private Const shtPWD As String = "Dac123am"
+
+
+'*******************************************************************************
+'Unlocks sheet using password constant. Parameter is sheet to unlock.
+'*******************************************************************************
+Sub ShtUnlock(strSht As String)
+
+    'unprotect sheet
+    Sheets(strSht).Unprotect shtPWD
+End Sub
+
+
+'*******************************************************************************
+'Lock sheet using password constant. Parameter is sheet to lock.
+'*******************************************************************************
+Sub ShtLock(strSht As String)
+
+    'Reset form lock areas
+    'FormLock strSht
+
+    'Protect sheet with constant variables
+    'With Sheets(strSht)
+    '    .EnableSelection = xlNoRestrictions
+    '    .Protect Password:=shtPWD, _
+    '        UserInterfaceOnly:=True, _
+    '        AllowFormattingCells:=True, _
+    '        AllowFormattingRows:=True, _
+    '        AllowFormattingColumns:=True, _
+    '        AllowDeletingRows:=False, _
+    '        AllowInsertingRows:=True, _
+    '        AllowSorting:=True, _
+    '        AllowFiltering:=True
+    'End With
+End Sub
+
+
+'*******************************************************************************
+'Clear data from sheets - delete all sheet names in the varSht parameter using
+'iRow as the starting position.
+'*******************************************************************************
+Sub ClearShts(varSht As Variant, iRow As Integer)
+
+    'Declare sub variables
+    Dim i As Integer
+
+    'Loop through Sheets
+    For i = 0 To UBound(varSht)
+
+        'Unlock sheets
+        ShtUnlock (varSht(i))
+
+        'Get last row
+        iLRow = LastRow(varSht(i)) + 1
+
+        'Focus on sheet and clear all data
+        With Sheets(varSht(i))
+            If .FilterMode Then .ShowAllData
+            .Range("A" & iRow & ":A" & iLRow).EntireRow.Delete
+        End With
+
+        'Lock sheets
+        ShtLock (varSht(i))
+    Next
+End Sub
+
+
+'*******************************************************************************
+'If workbook title contains an apostrophe then resave without apostrophe and
+'delete original file
+'*******************************************************************************
+Sub RenameWorkbook()
+
+    'Declare sub variables
+    Dim strPth As String
+    Dim strNm As String
+
+    'Get this workbook path and name
+    strPth = ThisWorkbook.Path & "\"
+    strNm = ThisWorkbook.Name
+
+    'Save workbook as new without apostrophe
+    ThisWorkbook.SaveAs strPth & Replace(strNm, "'", "")
+
+    'Delete original workbook with apostrophe
+    Kill strPth & strNm
+End Sub
+
+
+'*******************************************************************************
+'Fills main three CAL sheets with appropriate data & formats accordingly
+'*******************************************************************************
+Sub PopulatePages(strCst As String)
+
+    'Declare sub variables
+    Dim dctObj As New Scripting.Dictionary
+
+    'Set dictionary of CAL sheet object classes/sheet data
+    With dctObj
+        .Add oPrgms, Pull.GetPrograms(strCst, oPrgms.AllFlds)
+        .Add oCst, Pull.GetCstProfile(strCst)
+        .Add oDev, Pull.GetDevLds(strCst)
+    End With
+
+    'Loop through each key in dictionary
+    For Each Key In dctObj
+
+        'Insert class specific data to object sheet w/ formatting & protection
+        ShtRefresh Key.Sht, dctObj(Key)
+
+        'Insert class specific data to background utility sheet
+        iLRow = LastRow(Key.Save_Sht) + 1
+        If Not dctObj(Key).BOF Then dctObj(Key).MoveFirst
+        Sheets(Key.Save_Sht).Cells(iLRow, 1).CopyFromRecordset dctObj(Key)
+    Next
+
+    'Add conditional formatting to programs tab
+    AddCondFormatting (oPrgms.Sht)
+
+    'Add data validation (drop down options)
+    oPrgms.AddDataValidation
+    oCst.AddDataValidation
+    oDev.AddDataValidation
+End Sub
+
+
+'*******************************************************************************
+'Delete old sheet detail and paste new. Parameters are sheet name and open
+'recordset.
+'*******************************************************************************
+Sub ShtRefresh(strSht As String, upd As ADODB.Recordset)
+
+    'Unprotect sheet
+    ShtUnlock (strSht)
+
+    'Get last row of sheet
+    iLRow = LastRow(strSht) + 1
+
+    'Clear previous sheet content and paste new
+    With Sheets(strSht)
+        If .FilterMode Then .ShowAllData
+        .Cells(iLRow, 1).CopyFromRecordset upd
+    End With
+
+    'Format cell borders
+    AddBorders (strSht)
+
+    'Resize rows/columns
+    ResizeSht (strSht)
+
+    'Protect sheet
+    ShtLock (strSht)
+End Sub
+
+
+'*******************************************************************************
+'Finds column index of visible report (disregard gutter).
+'*******************************************************************************
+Function GutterCol(strSht As String) As Integer
+
+    'Declare function variable
+    Dim iCol As Integer
+    Dim i As Integer
+
+    'Get last column index
+    iLCol = LastCol(strSht)
+
+    'Activate focus sheet
+    With Sheets(strSht)
+
+        'Loop through header
+        For i = 1 To iLCol
+
+            'If column is not hidden, save column index and exit variable.
+            If .Columns(i).Hidden = False Then
+                iCol = i
+                Exit For
+            End If
+        Next
+    End With
+
+    'Return first field column index
+    GutterCol = iCol
+End Function
+
+
+'*******************************************************************************
+'Resize sheet to display proper sizing.
+'*******************************************************************************
+Sub ResizeSht(strSht As String)
+
+    'Delcare sub variables
+    Dim iCol As Integer
+    Dim rng As Range
+
+    'Get last column index
+    iLRow = LastRow(strSht)
+    iLCol = LastCol(strSht)
+
+    'Get gutter index
+    iCol = GutterCol(strSht)
+
+    'Focus on sheet
+    With Sheets(strSht)
+
+        'Activate sheet(dumb Excel error that makes you format active sheet
+        .Activate
+
+        'Set range to resize
+        Set rng = .Range(.Cells(1, iCol), .Cells(iLRow, iLCol))
+    End With
+
+    'Focus on Range
+    With rng
+
+        'Format row/column sizing
+        .Columns.ColumnWidth = 100
+        .Rows.RowHeight = 300
+        .Columns.AutoFit
+        .Rows.AutoFit
+    End With
+End Sub
+
+
+'*******************************************************************************
+'Lock all white space on sheet
+'*******************************************************************************
+Sub FormLock(strSht As String)
+
+    'If passthrough sheet is control panel
+    If strSht = "Control Panel" Then
+
+        'Protect All cells
+        Sheets(strSht).Cells.Locked = True
+
+    'If passthrough sheet is not control panel
+    Else
+
+        'Get last row and last column
+        iLRow = LastRow(strSht)
+        iLCol = LastCol(strSht) + 1
+
+        'Focus on sheet
+        With Sheets(strSht)
+
+            'Unlock all cells
+            .Cells.Locked = False
+
+            'If sheet has data populated
+            If .Cells(2, 1).Value <> "" Then
+
+                'Lock Primary Key & Customer ID column
+                .Range(.Cells(2, 1), .Cells(iLRow, 2)).Locked = True
+
+                'Lock all fields to the right of data range
+                .Range(.Cells(1, iLCol), .Cells(iLRow, .Columns.Count)).Locked = True
+            End If
+
+            'Lock all fields under data range
+            .Range(.Cells(iLRow + 1, 1), _
+                .Cells(.Rows.Count, 1)).EntireRow.Locked = True
+        End With
+    End If
+End Sub
+
+
+'*******************************************************************************
+'Add conditional formatting to the Programs tab. Weekly programs are highlighted
+'green and programs expiring EOM are highlighted red.
+'*******************************************************************************
+Sub AddCondFormatting(Sht As Variant)
+
+    'Declare sub variables
+    Dim rngFrmt As Range
+    Dim strDteRng As String
+    Dim iStrt As Integer
+    Dim iEnd As Integer
+
+    'Get last row of sheet
+    iLRow = LastRow(Sht)
+
+    'Activate Programs tab
+    With Sheets(Sht)
+
+        'Get column Location
+        iStrt = .Rows(1).Find("START DATE").Column
+        iEnd = .Rows(1).Find("END DATE").Column
+
+        'Find last row
+        iLRow = .Cells(.Rows.Count, 1).End(xlUp).row
+
+        'Set range to be formatted
+        Set rngFrmt = .Range(.Cells(2, iEnd), .Cells(iLRow, iEnd))
+
+        'Get formula string for weekly highlight (end-iStart)
+        strDteRng = Replace(.Cells(2, iEnd).Address _
+            & "-" & .Cells(2, iStrt).Address, "$", "")
+
+        'Clear conditional formatting from range
+        rngFrmt.FormatConditions.Delete
+
+        'Set conditional formatting for weekly programs
+        rngFrmt.FormatConditions.Add(xlExpression, xlEqual, Formula1:="=(" _
+            & strDteRng & ")=6").Interior.Color = RGB(137, 191, 101)
+
+        'Set conditional formatting for standard programs
+        rngFrmt.FormatConditions.Add(xlCellValue, xlLess, "=" & _
+            CLng(DateSerial(Year(Now), Month(Now) + 1, 11))).Interior.Color = _
+            RGB(250, 120, 120)
+    End With
+End Sub
+
+
+'*******************************************************************************
+'Add drop down items to excel file to be referenced for dropdown formatting.
+'*******************************************************************************
+Sub AddDropDwns()
+
+    'Declare sub variables
+    Dim dropDwns As Variant
+    Dim myCst As Variant
+    Dim othCst As Variant
+    Dim othAss As Variant
+    Dim varLst As Variant
+    Dim iRow As Integer
+    Dim iCol As Integer
+    Dim i As Integer
+    Dim headers As Variant
+
+    'Setup headers
+    headers = Array("TIER", "VA TYPE", "COST BASIS", "CA TYPE", "REBATE BASIS", "APPROP", "ASSIGNED", "UNASSIGNED", "USERS")
+
+    'Get multidimensional arrays of drop down database
+    dropDwns = Pull.GetDropDwns
+    myCst = Pull.GetCst(True)
+    othCst = Pull.GetCst(False)
+    othAss = Pull.GetAssName
+
+    'Setup array of specific dropdown tasks
+    varLst = Array(myCst, othCst, othAss)
+
+    'Clear old Dropdown values
+    With Sheets(strDrpSht)
+
+        .Cells.Value = ""
+        .Range(.Cells(1, 1), .Cells(1, UBound(headers) + 1)).Value = headers
+    End With
+
+    'Focus on DropDowns sheet
+    With Sheets(strDrpSht)
+
+        'Loop through rows in dropdown multidimensional array
+        For iRow = 0 To UBound(dropDwns, 2)
+
+            'Get dropdown column
+            iCol = dropDwns(1, iRow)
+
+            'Set last row
+            iLRow = .Cells(.Rows.Count, iCol).End(xlUp).row + 1
+
+            'Paste dropdowns in appropriate columns
+            .Cells(iLRow, iCol).Value = dropDwns(0, iRow)
+        Next
+
+        'Loop through array of each drop down category
+        For i = 0 To UBound(varLst)
+
+            'Set column index on dropdown sheet
+            iCol = .Cells(2, .Columns.Count).End(xlToLeft).Column + 1
+
+            'If no assigned customers then
+            If UBound(varLst(i)) = -1 Then
+
+                'Add (Blank) to drop down field
+                .Cells(2, iCol).Value = "(Blank)"
+
+            'If user has assigned customers
+            Else
+
+                'Loop through each element of assigned customer array
+                For iRow = 0 To UBound(varLst(i))
+
+                    'Set last row
+                    iLRow = .Cells(.Rows.Count, iCol).End(xlUp).row + 1
+
+                    'Paste assigned customers in list format
+                    .Cells(iLRow, iCol).Value = varLst(i)(iRow)
+                Next
+            End If
+        Next
+    End With
+End Sub
+
+
+'*******************************************************************************
+'Update assigned/unassigned customer dropdown options
+'*******************************************************************************
+Sub ReviseDropDwns(varCst As Variant, blCst As Boolean)
+
+    'Declare sub variables
+    Dim iCol As Integer
+    Dim rng As Range
+
+    'Focus on DropDowns sheet
+    With Sheets(strDrpSht)
+
+        'Loop through all customers in passthrough array
+        For i = 0 To UBound(varCst)
+
+            'If focus is Customer columns
+            If blCst = True Then
+
+                'Remove (Blank) value if present
+                If .Cells(2, "G").Value = "(Blank)" Then _
+                    .Cells(2, "G").Value = ""
+
+                'Get last row (custom column)
+                iLRow = .Cells(.Rows.Count, "G").End(xlUp).row + 1
+
+                'Add customers to assigned customer list
+                .Cells(iLRow, "G").Value = varCst(i)
+
+                'Set column to remove customer value
+                iCol = Columns("H").Column
+
+            'If focus is Associate column
+            Else
+
+                'Set column to remove associate value
+                iCol = Columns("I").Column
+            End If
+
+            'Set value location to range
+            'Set rng = .Columns(iCol).Find(varCst(i))
+
+            'If value not found in focus column to left, delete from focus col
+            .Cells(.Columns(iCol).Find(varCst(i)).row, iCol).Delete
+        Next
+    End With
+End Sub
+
+
+'*******************************************************************************
+'Resize multiuse listbox to help accomodate different screen aspect ratios.
+'*******************************************************************************
+Sub ResizeListbox()
+
+    'Focus on Control Panel Sheet
+    With Sheets("Control Panel")
+        .Shapes("Multiuse_Listbox").Width = .Shapes("Listbox_Pane").Width - 20
+        .Shapes("Multiuse_Listbox").Height = .Shapes("Listbox_Pane").Height - 75
+        .Shapes("Multiuse_Listbox").Top = .Shapes("Listbox_Pane").Top + 36
+        .Shapes("Multiuse_Listbox").Left = .Shapes("Listbox_Pane").Left + 9
+    End With
+End Sub
+
+
+'*******************************************************************************
+'Show all elements of selected Control Panel utility. Variant array includes
+'all shapes to unhide.
+'*******************************************************************************
+Sub ShowShapes(varShapes As Variant)
+
+    'Focus on Control Panel sheet
+    With Sheets("Control Panel")
+
+        'Loop through all shapes in object library
+        For Each shp In varShapes
+
+            'Unhide shape
+            .Shapes(shp).Visible = True
+        Next
+    End With
+End Sub
+
+
+'*******************************************************************************
+'Show all elements of selected Control Panel utility. Variant array includes
+'all shapes to unhide.
+'*******************************************************************************
+Sub ShowSheets(varSht As Variant, blShow As Boolean)
+
+    'Loop through all shapes in object library
+    For Each Sht In varSht
+
+        'Unhide sheet
+        Sheets(Sht).Visible = blShow
+    Next
+End Sub
+
+
+'*******************************************************************************
+'Return string of user selections (wrapped in quotes).
+'*******************************************************************************
+Function GetSelection() As Variant
+
+    'Declare function variables
+    Dim strCst As String
+    Dim strAss As String
+
+    'Loop through all dropdowns to create string
+    With Sheets("Control Panel").Multiuse_Listbox
+        For i = 0 To .ListCount - 1
+            If .Selected(i) Then strCst = Append(strCst, "|", .List(i))
+        Next
+    End With
+
+    'If a selection was made
+    If strCst <> "" Then
+
+        'Return a list of customers if slection is by account holder, not customer
+        If IsToggle("Listbox_Associate_Tgl") Then
+
+            'Revise associate dropdowns
+            ReviseDropDwns Split(strCst, "|"), False
+
+            'Get account assignments from account holder name
+            strAss = GetStr(Split(strCst, "|"), True)
+            strAss = GetStr(Pull.GetAssID(strAss), True)
+            strCst = Pull.GetAssignments(strAss)
+        End If
+
+        'Return string of customers
+         GetSelection = Split(strCst, "|")
+    End If
+End Function
+
+
+'*******************************************************************************
+'Prompt user to select a folder, create new folder, return folder path.
+'*******************************************************************************
+Function SelectFolder() As String
+
+    'Declare function variables
+    Dim FldrPicker As FileDialog
+    Dim strPth As String
+
+    'Setup file dialog picker
+    Set FldrPicker = Application.FileDialog(msoFileDialogFolderPicker)
+
+    'Open dialog settings
+    With FldrPicker
+
+        'Set title and settings
+        .Title = "Select Folder Location"
+        .AllowMultiSelect = False
+
+        'Show dialog and save path to string
+        If .Show = -1 Then strPth = .SelectedItems(1)
+    End With
+
+    'If path was selected then return selected folder
+    If strPth <> "" Then SelectFolder = strPth & "\"
+End Function
+
+
+'*******************************************************************************
+'Create new workbook with white formatting.
+'*******************************************************************************
+Sub CreateWorkbook(strName As String)
+
+    'Create new workbook
+    Workbooks.Add
+
+    'Add blank formatting to workbook
+    Cells.Interior.Color = vbWhite
+
+    'Rename active sheet of new workbook
+    ActiveSheet.Name = strName
+End Sub
+
+
+'*******************************************************************************
+'Create new sheet (workbook if on CAL workbook) with white formatting.
+'*******************************************************************************
+Sub NewSheet(strName As String)
+
+    'If active workbook is not CAL workbook
+    If InStr(ActiveWorkbook.Name, "CAL") = 0 Then
+
+        'Create new sheet with name
+        Sheets.Add(after:=Sheets(Sheets.Count)).Name = strName
+
+    'If active workbook is CAL workbook
+    Else
+
+        'Create new workbook
+        Workbooks.Add
+
+        'Rename active sheet of new workbook
+        ActiveSheet.Name = strName
+    End If
+
+    'Add blank formatting to workbook
+    Cells.Interior.Color = vbWhite
+End Sub
+
+
+'*******************************************************************************
+'Add headers to active workbook with formatting.
+'*******************************************************************************
+Sub AddHeaders(varHeaders As Variant)
+
+    'Declare sub variables
+    Dim i As Integer
+    Dim iRow As Integer
+
+    'Loop through all elements in passthrough array
+    For i = 0 To UBound(varHeaders)
+
+        'Add value and formatting to cell
+        With Cells(1, i + 1)
+            .Value = varHeaders(i)
+            .Interior.Color = RGB(68, 114, 196)
+            .Font.Color = vbWhite
+            .Font.Bold = True
+        End With
+
+        'Fit columns to new headers
+        Columns.AutoFit
+    Next
+End Sub
+
+
+'*******************************************************************************
+'Add borders to any range, assuming data starts in cell A1 and contains headers
+'*******************************************************************************
+Sub AddBorders(Sht As Variant)
+
+    'Get last row and last column
+    iLRow = LastRow(Sht)
+    iLCol = LastCol(Sht)
+
+    'Set borders to data range
+    With Sheets(Sht)
+        .Range(.Cells(iLRow, 1), .Cells(1, iLCol)).Borders.LineStyle = xlContinuous
+    End With
+End Sub
+
+
+'*******************************************************************************
+'Download customer friendly CAL to folder
+'*******************************************************************************
+Function DwnCstCAL(cst As Variant) As Workbook
+
+    'Declare sub variables
+    Dim strCst As String
+
+    'Create new Workbook w/ formatting
+    CreateWorkbook (cst)
+
+    'Add headers to Workbook
+    AddHeaders (oPrgms.CstHeaders)
+
+    'Setup customer string with quote delimiters
+    strCst = "'" & cst & "'"
+
+    'Query customer records and paste to sheet
+    Cells(2, 1).CopyFromRecordset Pull.GetPrograms(strCst, oPrgms.CstFlds)
+
+    'Add borders to Workbook
+    AddBorders (cst)
+
+    'Resize rows and column
+    ResizeSht (cst)
+
+    'Add conditional formatting (indeces are for Excel start/end date fields)
+    AddCondFormatting (cst)
+
+    'Return Workbook
+    Set DwnCstCAL = ActiveWorkbook
+End Function
+
+
+'*******************************************************************************
+'Assemble body of reminder emails (bulleted list of expiring agreements).
+'*******************************************************************************
+Function GetReminderBody(cst As Variant) As String
+
+    'Declare function variables
+    Dim exp As ADODB.Recordset
+    Dim strExp As String
+    Dim strDelmtr As String
+
+    'Get recordset of expiring progrmas
+    Set exp = Pull.GetExpPrograms(cst)
+
+    'Setup string delimiter variable
+    strDelmtr = "<br />   " & Chr(149) & " "
+
+    'Assemble string of program descriptions (bulleted & n\)
+    Do While Not exp.EOF
+        strExp = strExp & strDelmtr & exp.Fields("PROGRAM_DESCRIPTION").Value
+        exp.MoveNext
+    Loop
+
+    'Return string of expiring agreements
+    GetReminderBody = strExp
+End Function
+
+
+'*******************************************************************************
+'Send reminder to DPM hotline Salesforce queue.
+'*******************************************************************************
+Sub SendReminder(strSubject As String, strTxt As String, strFile As String)
+
+    'Declare sub variables
+    Dim olOutlook As Object
+    Dim olEmail As Object
+
+    'Set email object
+    Set olOutlook = CreateObject("Outlook.Application")
+    Set olEmail = olOutlook.CreateItem(olMailItem)
+
+    'Send email to inquiries queue
+     With olEmail
+        .To = "DPMHotline@corp.sysco.com"
+        .Subject = strSubject
+        .HTMLBody = strTxt
+        .Attachments.Add strFile
+        .Send
+    End With
+
+    'Free objects
+    Set olEmail = Nothing
+    Set olOutlook = Nothing
+End Sub
+
+
+'*******************************************************************************
+'Update multiuse listbox with list of customers. Boolean operator indicates
+'if listbox should conatain assigned customers or unassigned customers.
+'*******************************************************************************
+Sub ListboxByCst(blMyCst As Boolean)
+
+    'Focus on dropdowns sheet
+    With Sheets(strDrpSht)
+
+        'If listbox should be populated with assigned customers
+        If blMyCst = True Then
+
+            'Find last row of Dropowns sheet (custom column)
+            iLRow = .Cells(.Rows.Count, "G").End(xlUp).row + 1
+
+            'Update customer list be just unassigned customers
+            Sheets("Control Panel").Multiuse_Listbox.List = _
+                .Range("G2:G" & iLRow).Value
+
+        'If listbox should be populated with unassigned customers
+        Else
+
+            'Find last row of Dropowns sheet (custom column)
+            iLRow = .Cells(.Rows.Count, "H").End(xlUp).row + 1
+
+            'Update customer list be just unassigned customers
+            Sheets("Control Panel").Multiuse_Listbox.List = _
+                .Range("H2:H" & iLRow).Value
+        End If
+    End With
+
+    'Highlight button
+    ResetToggle
+    Sheets("Control Panel").Shapes("Listbox_Account_Tgl").Fill.ForeColor.RGB = _
+        RGB(64, 64, 64)
+
+    'Correct listbox sizing
+    ResizeListbox
+End Sub
+
+
+'*******************************************************************************
+'Update multiuse listbox to display GPO customers. Listbox will only populate
+'with GPO customers the user is currently working on (assigned and pulled).
+'*******************************************************************************
+Function ListboxByGPO() As Integer
+
+    'Declare sub variables
+    Dim varGPO As Variant
+    Dim strCst As String
+
+    'Focus on dropdowns sheet
+    With Sheets(strDrpSht)
+
+        'Find last row of Dropowns sheet (custom column)
+        iLRow = .Cells(.Rows.Count, "G").End(xlUp).row + 1
+
+        'Get comma/single quote delimited string from customer array
+        strCst = "'" & Application.WorksheetFunction.TextJoin("','", True, _
+            .Range("G2:G" & iLRow)) & "'"
+    End With
+
+    'Get list of working GPO customers
+    varGPO = Pull.GetGPO(strCst)
+
+    'If the user is working with at least one GPO customers
+    If Not IsEmpty(varGPO) Then
+
+        'Update listbox with working GPO customers
+        Sheets("Control Panel").Multiuse_Listbox.List = varGPO
+
+        'Set listbox size/shape and display
+        ResizeListbox
+
+        'Return true value
+        ListboxByGPO = UBound(varGPO)
+
+    'If the user is not working with any GPO customers
+    Else
+
+        'Alert user of no available customers
+        MsgBox "No GPO customers to display. " & vbLf & vbLf _
+            & "Select GPO customer(s) using the Pull Unassigned " _
+            & "Customers utility and try again.", vbExclamation, "No Data Found"
+    End If
+End Function
+
+
+'*******************************************************************************
+'Returns Boolean value to indicate if multiuse listbox selection was made with
+'containing customer or account holder.
+'*******************************************************************************
+Function IsToggle(strShp As String) As Boolean
+
+    'Return true if associate name was selected
+    If Sheets("Control Panel").Shapes(strShp).Fill.ForeColor = _
+        RGB(64, 64, 64) Then IsToggle = True
+End Function
+
+
+'*******************************************************************************
+'Reset listbox toggle buttons to default color
+'*******************************************************************************
+Sub ResetToggle()
+
+    'Set all toggle
+    With Sheets("Control Panel")
+        .Shapes("Listbox_Associate_Tgl").Fill.ForeColor.RGB = RGB(89, 89, 89)
+        .Shapes("Listbox_Account_Tgl").Fill.ForeColor.RGB = RGB(89, 89, 89)
+        .Shapes("Listbox_All_Tgl").Fill.ForeColor.RGB = RGB(89, 89, 89)
+    End With
+End Sub
+
+
+'*******************************************************************************
+'Hide any shapes on Control Panel sheet that are not constant UI elements.
+'*******************************************************************************
+Sub ClearShapes()
+
+    'Ensure Control panel is the active sheet
+    ThisWorkbook.Sheets("Control Panel").Activate
+
+    'Hide item coding list
+    Range("P1:Q1").EntireColumn.Hidden = True
+
+    'Loop through each shape in Control panel
+    For Each shp In Sheets("Control Panel").Shapes
+
+        'Hide shape if it is not a constant UI element
+        If InStr(shp.Name, "Const") = 0 Then shp.Visible = False
+    Next
+End Sub
+
+
+'*******************************************************************************
+'Toggle sheet visibility for
+'*******************************************************************************
+Sub SheetVisible(Sht As String, blShow)
+
+    'Declare sub variables
+    Dim ws As Worksheet
+    Dim strEx As String
+    Dim varDflt As Variant
+
+    'Setup sheets to exclude with wildcard seperating sheets
+    strEx = "(Utility)"
+
+    'Loop through each sheet in workbook
+    If Sht = "Default" Then
+
+        varDflt = Array( _
+            "Programs", _
+            "Customer Profile", _
+            "Deviation Loads", _
+            "Control Panel")
+
+        For Each var In varDflt
+            Sheets(var).Visible = blShow
+        Next
+    Else
+        For Each ws In Worksheets
+
+            'Hide sheet if it does not contain passthrough keyword
+            If InStr(ws.Name, Sht) = 0 And InStr(ws.Name, strEx) = 0 Then _
+                ws.Visible = blShow
+        Next
+    End If
+End Sub
+
+
+'*******************************************************************************
+'Meant only archive recovery purposes. Returns column 1 of selected row
+'(Primary Key). Delete highlighted row and reset cursor point.
+'*******************************************************************************
+Function GetArchiveKey() As Long
+
+    'Ensure only one row is selected
+    If selection.Rows.Count = 1 Then
+
+        'Return Primary key of recovery line
+        GetArchiveKey = Cells(selection.row, 1)
+
+        'Delete selected row and move cursor
+        Rows(selection.row).Delete
+        Cells(2, 1).Activate
+
+    'If more than one row was selected
+    Else
+
+        'Alert user of incorrect process
+        MsgBox "Please select one row at a time"
+    End If
+End Function
+
+
+'*******************************************************************************
+'Parse string into multiple values. Parse strVal into segments of iLen length
+'and paste each segment in list format in column iCol. Include borders in paste
+'*******************************************************************************
+Sub PasteList(val As Variant, iLen, iCol)
+
+    'Declare module variables
+    Dim i As Integer
+
+    'Paste OpCo into list
+    For i = 1 To Len(val)
+
+        'Get last row
+        iLRow = Cells(Rows.Count, iCol).End(xlUp).row + 1
+
+        'Paste string segment in last row
+        Cells(iLRow, iCol) = "'" & Mid(val, i, iLen)
+
+        'Iterate loop to next segment
+        i = i + iLen - 1
+    Next
+
+    'Add borders to list
+    AddBorders (ActiveSheet.Name)
+End Sub
+
+
+'*******************************************************************************
+'Paste overlapping customer detail with appropriate detail.
+'*******************************************************************************
+Sub PasteOverlap(upd As ADODB.Recordset)
+
+    'Paste recordset to range A2
+    Range("A2").CopyFromRecordset upd
+
+    'Remove duplicates
+    Columns(1).RemoveDuplicates Columns:=Array(1)
+    Columns(2).RemoveDuplicates Columns:=Array(1)
+End Sub
+
+
+'*******************************************************************************
+'Get user inputted MPC/GTIN for Item Lookup tool
+'*******************************************************************************
+Function GetItmSearch(strCol As String)
+
+    'Declare function variables
+    Dim strItm As String
+    Dim strInvalid As String
+
+    'Setup string for GTIN invalid search
+    strInvalid = "123123123"
+
+    'If input is not in list format
+    If ActiveWorkbook.Name = ThisWorkbook.Name Then
+
+        'If MPC assemble string
+        If strCol = "A" Then
+
+            'Save item to variable
+            strItm = Trim(Item_Lookup.MPC.Text)
+
+        'If GTIN assemble string
+        Else
+
+            'Save item to variable
+            strItm = Trim(Item_Lookup.GTIN.Text)
+
+            'If value is not numeric then set to invalid search
+            If strItm <> "" And Not IsNumeric(strItm) Then strItm = strInvalid
+        End If
+
+
+    'If input is in list format
+    Else
+
+        'Get last row
+        iLRow = Range(strCol & Rows.Count).End(xlUp).row
+
+        'Loop through list of MPCs
+        For Each R In Range(strCol & "2:" & strCol & iLRow)
+
+            'Create SQL string of MPCs/GTINs
+            If Not (strCol <> "A" And Not IsNumeric(Trim(R.Value))) Then _
+                strItm = Append(strItm, "','", Trim(R.Value))
+        Next
+    End If
+
+    'Return MPC(s)
+    If strItm <> "" Then GetItmSearch = "'" & strItm & "'"
+End Function
+
+
+'*******************************************************************************
+'Utilize the xGTIN/xMPC pull queries to get recordset of SUPCs
+'*******************************************************************************
+Function GetSUPC(strGTIN As String, strMPC As String) As ADODB.Recordset
+
+    'Declare function variables
+    Dim rstTemp As ADODB.Recordset
+
+    'If GTIN is provided
+    If strGTIN <> "" Then
+
+        'Query based on GTIN entry
+        Set rstTemp = Pull.GetSUPCxGTIN(strGTIN)
+
+        'If no results are returned query using MPC
+        If rstTemp.EOF And MPC <> "" Then Set rstTemp = Pull.GetSUPCxMPC(strMPC)
+
+    'If GTIN did not return results or no GTINs were provided, try with MPC
+    ElseIf strMPC <> "" Then
+
+        'query using MPC
+        Set rstTemp = Pull.GetSUPCxMPC(strMPC)
+    End If
+
+    'Return query results
+    Set GetSUPC = rstTemp
+End Function
+
+
+'*******************************************************************************
+'Pull a validated list of agreement numbers *meant to pull GPO Matrix data.
+'*******************************************************************************
+Function GetAgmtGPO(strSht As String, strRng As String) As Variant
+
+    'Declare Variables
+    Dim dct As New Scripting.Dictionary
+    Dim var As Variant
+    Dim strCA As String
+    Dim strVA As String
+    Dim strSQLCA As String
+    Dim strSQLVA As String
+    Dim iRow As Integer
+
+    'Get last row of passthrough sheet
+    iLRow = LastRow(strSht)
+
+    'Create multidimensional array of passthrough range
+    var = Sheets(strSht).Range(strRng & iLRow).Value
+
+    'Loop through each row of multidimensional array
+    For iRow = 1 To UBound(var)
+
+        'Assign temp identity variables to make code more readable
+        strVA = Trim(var(iRow, 1))
+        strCA = Trim(var(iRow, 2))
+
+        'If there is a CA provided
+        If strCA <> "" Then
+
+            'If CA is longer than 6 characters then get clean num value
+            If Len(strCA) > 6 Then strCA = GetNumeric(strCA, 6)
+
+            'If CA is 6 characters long and is numeric
+            If Len(strCA) = 6 And IsNumeric(strCA) Then
+
+                'Assemble CA query string and save row/agmt to dict
+                strSQLCA = Append(strSQLCA, "','", "000" & strCA)
+                dct(strCA) = iRow + 1
+            End If
+
+        'If there is no CA provided
+        Else
+
+            'If VA is longer than 6 characters then get clean num value
+            If Len(strVA) > 6 Then strVA = GetNumeric(strVA, 6)
+
+            'If VA is 6 characters long and is numeric
+            If Len(strVA) = 6 And IsNumeric(strVA) Then
+
+                'Assemble VA query string and save row/agmt to dict
+                strSQLVA = Append(strSQLVA, "','", "000" & strVA)
+                dct(strVA) = iRow + 1
+            End If
+        End If
+    Next
+
+    'Add header and footer single quotes to both VA & CA strings
+    strSQLCA = "'" & strSQLCA & "'"
+    strSQLVA = "'" & strSQLVA & "'"
+
+    'Return array of VA, CA & dictionary containing row location
+    GetAgmtGPO = Array(strSQLCA, strSQLVA, dct)
+End Function
+
+
+'*******************************************************************************
+'Transpose the matrix from pasthrough dictionary to passthrough sheet.
+'*******************************************************************************
+Function TransMatrix(strSht As String, dct As Scripting.Dictionary)
+
+    'Declare variables
+    Dim iCol As Integer
+
+    'Set last row/column
+    iLRow = LastRow(strSht)
+    iLCol = LastCol(strSht) + 1
+
+    'Focus on passthrough sheet
+    With Sheets(strSht)
+
+        'Loop through all Keys in metrics
+        For Each Key In dct
+
+            'Get next column index
+            iCol = .Cells(1, .Columns.Count).End(xlToLeft).Column + 1
+
+            'Add column header to template
+            .Cells(1, iCol).Value = Key
+
+            'Convert dictionary item to array
+            dct(Key) = Split(dct(Key), "|")
+
+            'Loop through each element of item array to fill in eligibility
+            For i = 0 To UBound(dct(Key))
+
+                'X marks the spot for eligible agreements
+                .Cells(dct(Key)(i), iCol).Value = "X"
+            Next
+        Next
+
+        'Focus on new matrix headers range
+        With .Range(.Cells(1, iLCol), .Cells(1, LastCol(strSht)))
+
+            'Format header font color, dircection, bold & cell color
+            .Orientation = xlUpward
+            .Interior.Color = RGB(68, 114, 196)
+            .Font.Color = vbWhite
+            .Font.Bold = True
+        End With
+    End With
+End Function
+
+
+'*******************************************************************************
+'Create gutter header to allow utility button.
+'*******************************************************************************
+Sub AddBlankHeader(strSht As String)
+
+    'Focus on passthrough sheet
+    With Sheets(strSht)
+
+        'Get last column
+        iLCol = LastCol(strSht)
+
+        'Insert new row in position 1
+        .Rows(1).Insert
+
+        'Add text to cell 1 for sizing
+        With .Cells(1, 1)
+            .Value = "X"
+            .Font.Size = 24
+            .Font.Color = RGB(64, 64, 64)
+        End With
+
+        'Change header cell color and borders
+        .Range(.Cells(1, 1), .Cells(1, iLCol)).Interior.Color = RGB(64, 64, 64)
+
+        'Correct height of column
+        .Rows(1).AutoFit
+    End With
+End Sub
+
+
+'*******************************************************************************
+'Sync changes for each class sheet. Update background save sheets to after
+'successful upload.
+'*******************************************************************************
+Sub SyncChanges()
+
+    'Declare sub variables
+    Dim varObj As Variant
+    
+    'Setup array of class sheets
+    varObj = Array(oPrgms, oCst, oDev)
+
+    'Loop through each object in array
+    For Each obj In varObj
+
+        'Sync class sheet changes to server
+        If obj.Sync = True Then
+
+            'Clear existing sheet data
+            ClearShts Array(obj.SaveSht), 2
+
+            'Paste class sheet data to class background save sheet
+            Sheets(obj.SaveSht).Range("A2").CopyFromRecordset _
+                Pull.GetXLRst(obj.Sht)
+        End If
+    Next
+End Sub

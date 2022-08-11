@@ -1,0 +1,53 @@
+
+'Declare private module constants
+Private Const strSht As String = "Control Panel"
+
+
+'*******************************************************************************
+'Get fresh data directly from server. Delete old records, replace with new &
+'format accordingly. Runs across main tabs. Test final
+'*******************************************************************************
+Sub Refresh_Data_Initialize()
+
+    'Declare sub variables
+    Dim strCst As String
+    Dim varSht As Variant
+
+    'Show loading icon
+    Loading.Show 0
+    DoEvents
+
+    'Freeze Screen updating
+    Application.ScreenUpdating = False
+    Application.EnableEvents = False
+
+    'Setup array of objects used in this sub routine
+    varSht = Array(oPrgms.Sht, oPrgms.Save_Sht, oCst.Sht, _
+        oCst.Save_Sht, oDev.Sht, oDev.Save_Sht)
+
+    'Clear data from sheets. Parameters: all sheets + header row
+    Utility.ClearShts varSht, 2
+
+    'Get String of my customer names
+    strCst = GetStr(Pull.GetCst(True), True)
+
+    'Refresh drop down sheet (hidden)
+    Utility.AddDropDwns
+
+    'If user has assigned customers, populate CAL sheets with refreshed data
+    If strCst <> "" Then Utility.PopulatePages (strCst)
+
+    'Clear any open shapes (even though there are no utility shapes)
+    Utility.ClearShapes
+
+    'Lock Control Panel
+    Utility.ShtUnlock strSht
+    Utility.ShtLock strSht
+
+    'Reset screen updating options
+    Application.ScreenUpdating = True
+    Application.EnableEvents = True
+
+    'hide loading icon
+    Unload Loading
+End Sub

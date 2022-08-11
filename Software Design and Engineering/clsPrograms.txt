@@ -1,0 +1,447 @@
+
+'Declare private class constants
+Private Const iPKey As Integer = 0
+Private Const iDAB As Integer = 1
+Private Const iTime As Integer = 3
+Private Const iTier As Integer = 4
+Private Const iCst As Integer = 5
+Private Const iPrgm As Integer = 6
+Private Const iSDte As Integer = 7
+Private Const iEDte As Integer = 8
+Private Const iVAType As Integer = 11
+Private Const iVend As Integer = 12
+Private Const iCost As Integer = 13
+Private Const iCAType As Integer = 14
+Private Const iRebate As Integer = 15
+Private Const iApprop As Integer = 17
+Private Const strSht As String = "Programs"
+Private Const strSaveSht As String = "Programs (Utility)"
+Private Const strShtx As String = "Recover Programs"
+Private Const strDb As String = "CAL_Programs "
+Private Const strDbx As String = "CAL_Programs_Archive "
+Private Const strFldx As String = "PROGRAM_ID"
+Private Const strGPOFlds As String = _
+    "CUSTOMER, " _
+    & "PROGRAM_DESCRIPTION, " _
+    & "LEAD_VA, " _
+    & "LEAD_CA"
+Private Const strCstFlds As String = _
+    "PROGRAM_DESCRIPTION, " _
+    & "START_DATE, " _
+    & "END_DATE, " _
+    & "LEAD_VA, " _
+    & "LEAD_CA, " _
+    & "VEND_AGMT_TYPE, " _
+    & "VENDOR_NUM, " _
+    & "COST_BASIS, " _
+    & "CUST_AGMT_TYPE, " _
+    & "REBATE_BASIS, " _
+    & "PRE_APPROVAL, " _
+    & "APPROP_NAME, " _
+    & "PRN_GRP, " _
+    & "PACKET, " _
+    & "PACKET_DL, " _
+    & "COMMENTS"
+Private Const ret_val As String = _
+    "T1.[DAB]," _
+    & "T1.[SCRIPT]," _
+    & "T1.[TIME]," _
+    & "T1.[TIER]," _
+    & "T1.[CUSTOMER]," _
+    & "T1.[PROGRAM DESCRIPTION]," _
+    & "T1.[START DATE]," _
+    & "T1.[END DATE]," _
+    & "T1.[LEAD VA]," _
+    & "T1.[LEAD CA]," _
+    & "T1.[VA TYPE]," _
+    & "T1.[VENDOR]," _
+    & "T1.[COST BASIS]," _
+    & "T1.[CA TYPE]," _
+    & "T1.[REBATE BASIS]," _
+    & "T1.[PRE APPROVAL]," _
+    & "T1.[APPROP NAME]," _
+    & "T1.[PRN/GRP]," _
+    & "T1.[PACKET]," _
+    & "T1.[PACKET DL]," _
+    & "T1.[COMMENTS] "
+Private Const tbl_cols As String = _
+    "*[DAB] & " _
+    & "*[SCRIPT] & " _
+    & "*[TIME] & " _
+    & "*[TIER] & " _
+    & "*[CUSTOMER] & " _
+    & "*[PROGRAM DESCRIPTION] & " _
+    & "*[START DATE] & " _
+    & "*[END DATE] & " _
+    & "*[LEAD VA] & " _
+    & "*[LEAD CA] & " _
+    & "*[VA TYPE] & " _
+    & "*[VENDOR] & " _
+    & "*[COST BASIS] & " _
+    & "*[CA TYPE] & " _
+    & "*[REBATE BASIS] & " _
+    & "*[PRE APPROVAL] & " _
+    & "*[APPROP NAME] & " _
+    & "*[PRN/GRP] & " _
+    & "*[PACKET] & " _
+    & "*[PACKET DL] & " _
+    & "*[COMMENTS] "
+Private Const sql_cols As String = _
+    "DAB," _
+    & "SCRIPT_ASSIST," _
+    & "TIMELINESS," _
+    & "TIER," _
+    & "CUSTOMER," _
+    & "PROGRAM_DESCRIPTION," _
+    & "START_DATE," _
+    & "END_DATE," _
+    & "LEAD_VA," _
+    & "LEAD_CA," _
+    & "VEND_AGMT_TYPE," _
+    & "VENDOR_NUM," _
+    & "COST_BASIS," _
+    & "CUST_AGMT_TYPE," _
+    & "REBATE_BASIS," _
+    & "PRE_APPROVAL," _
+    & "APPROP_NAME," _
+    & "PRN_GRP," _
+    & "PACKET," _
+    & "PACKET_DL," _
+    & "COMMENTS"
+
+
+'Declare private class variables
+Private ado As New clsAdoConnection
+Private dictCol As New Scripting.Dictionary
+Private dictIndex As New Scripting.Dictionary
+Private varCstHeaders As Variant
+Private iCol As Integer
+Private iRow As Integer
+Private iMultiInsert As Integer
+Private strExclusion As String
+Private cnn As New ADODB.Connection
+Private rst As New ADODB.Recordset
+
+
+'*******************************************************************************
+'Property to return unique column name from CAL sheet.
+'*******************************************************************************
+Public Property Get Unique_Sht_Col() As String
+
+    'Return class sheet name
+    Unique_Sht_Col = "[PROGRAM DESCRIPTION]"
+End Property
+
+
+'*******************************************************************************
+'Property to return unique column name from sql server.
+'*******************************************************************************
+Public Property Get Unique_Sql_Col() As String
+
+    'Return class sheet name
+    Unique_Sql_Col = "PROGRAM_DESCRIPTION"
+End Property
+
+
+'*******************************************************************************
+'Property to return sql field names
+'*******************************************************************************
+Public Property Get Sql_Columns() As Variant
+
+    'Return class sheet name
+    Sql_Columns = sql_cols
+End Property
+
+
+'*******************************************************************************
+'Property to return excel field names
+'*******************************************************************************
+Public Property Get Tbl_Columns() As Variant
+
+    'Return class sheet name
+    Tbl_Columns = tbl_cols
+End Property
+
+
+'*******************************************************************************
+'Property to return field names
+'*******************************************************************************
+Public Property Get Return_Val() As Variant
+
+    'Return class sheet name
+    Return_Val = ret_val
+End Property
+
+
+'*******************************************************************************
+'Property to return customer friendly headers
+'*******************************************************************************
+Public Property Get CstHeaders() As Variant
+
+    'Return class sheet name
+    CstHeaders = varCstHeaders
+End Property
+
+
+'*******************************************************************************
+'Property to return customer friendly Db field names
+'*******************************************************************************
+Public Property Get CstFlds() As String
+
+    'Return class sheet name
+    CstFlds = strCstFlds
+End Property
+
+
+'*******************************************************************************
+'Property to return GPO matrix Db field names
+'*******************************************************************************
+Public Property Get GPOFlds() As String
+
+    'Return class sheet name
+    GPOFlds = strGPOFlds
+End Property
+
+
+'*******************************************************************************
+'Property to return class sheet name constant (Programs)
+'*******************************************************************************
+Public Property Get Sht() As String
+
+    'Return class sheet name
+    Sht = strSht
+End Property
+
+
+'*******************************************************************************
+'Property to return class background sheet name constant (Programs)
+'*******************************************************************************
+Public Property Get Save_Sht() As String
+
+    'Return class sheet name
+    Save_Sht = strSaveSht
+End Property
+
+
+'*******************************************************************************
+'Property to return class archive sheet name constant (Programs)
+'*******************************************************************************
+Public Property Get Sht_X() As String
+
+    'Return class sheet name
+    Sht_X = strShtx
+End Property
+
+
+'*******************************************************************************
+'Property to return class database table constant (CAL_Programs)
+'*******************************************************************************
+Public Property Get Tbl() As String
+
+    'Return class database table name
+    Tbl = strDb
+End Property
+
+
+'*******************************************************************************
+'Property to return class archive database table constant
+'*******************************************************************************
+Public Property Get Tbl_Archive() As String
+
+    'Return class database table name
+    Tbl_Archive = strDbx
+End Property
+
+
+'*******************************************************************************
+'Return all fields of CAL_Programs table
+'*******************************************************************************
+Public Property Get AllFlds() As String
+
+    'Declare property variables
+    Dim strFlds As String
+
+    'Loop through all key of the dictIndex Dictionary (convert date to readable)
+    For Each Key In dictIndex
+
+        'Assemble String of Fields
+        strFlds = Append(strFlds, ",", Key)
+    Next
+
+    'Return string of all fields
+    AllFlds = strFlds
+End Property
+
+
+'*******************************************************************************
+'Return delete by field.
+'*******************************************************************************
+Public Property Get Fldx() As String
+
+    'Return string of all fields
+    Fldx = strFldx
+End Property
+
+
+'*******************************************************************************
+'Property to return dictionary of class database field indeces(Key) and
+'field names(Item).
+'*******************************************************************************
+Public Property Get Cols() As Scripting.Dictionary
+
+    'Return class database field dictionary
+    Set Cols = dictCol
+End Property
+
+
+'*******************************************************************************
+'Property to return dictionary of class database field names(Key) and
+'field indeces(Item).
+'*******************************************************************************
+Public Property Get ColIndex() As Scripting.Dictionary
+
+    'Return class database field dictionary
+    Set ColIndex = dictIndex
+End Property
+
+
+'*******************************************************************************
+'Property to return dictionary of class database field indeces(Key) and
+'field type delimiter(Item). Delimiter is single quote(text) or not(number).
+'*******************************************************************************
+Public Property Get ColType() As Scripting.Dictionary
+
+    'Return class database field type dictionary
+    Set ColType = dictType
+End Property
+
+
+'*******************************************************************************
+'Initialize sub. Create dictionaries with column index & name keys
+'*******************************************************************************
+Private Sub Class_Initialize()
+
+    'Setup array of customer reminder headers
+    varCstHeaders = Array("PROGRAM DESCRIPTION", _
+    "START DATE", "END DATE", "LEAD VA", "LEAD CA", "VA TYPE", "VENDOR", _
+    "COST BASIS", "CA TYPE", "REBATE BASIS", "PRE APPROVAL", _
+    "APPROP NAME", "PRN/GRP", "PACKET", "PACKET DL", "COMMENTS")
+
+    'Assemble dictionary of field indeces(key) and names(item)
+    With dictCol
+        .Add 0, "PRIMARY_KEY"
+        .Add 1, "DAB"
+        .Add 2, "SCRIPT_ASSIST"
+        .Add 3, "TIMELINESS"
+        .Add 4, "TIER"
+        .Add 5, "CUSTOMER"
+        .Add 6, "PROGRAM_DESCRIPTION"
+        .Add 7, "START_DATE"
+        .Add 8, "END_DATE"
+        .Add 9, "LEAD_VA"
+        .Add 10, "LEAD_CA"
+        .Add 11, "VEND_AGMT_TYPE"
+        .Add 12, "VENDOR_NUM"
+        .Add 13, "COST_BASIS"
+        .Add 14, "CUST_AGMT_TYPE"
+        .Add 15, "REBATE_BASIS"
+        .Add 16, "PRE_APPROVAL"
+        .Add 17, "APPROP_NAME"
+        .Add 18, "PRN_GRP"
+        .Add 19, "PACKET"
+        .Add 20, "PACKET_DL"
+        .Add 21, "COMMENTS"
+    End With
+
+    'Assemble dictionary of field names(key) and indeces(item)
+    With dictIndex
+        .Add "PRIMARY_KEY", 0
+        .Add "DAB", 1
+        .Add "SCRIPT_ASSIST", 2
+        .Add "TIMELINESS", 3
+        .Add "TIER", 4
+        .Add "CUSTOMER", 5
+        .Add "PROGRAM_DESCRIPTION", 6
+        .Add "START_DATE", 7
+        .Add "END_DATE", 8
+        .Add "LEAD_VA", 9
+        .Add "LEAD_CA", 10
+        .Add "VEND_AGMT_TYPE", 11
+        .Add "VENDOR_NUM", 12
+        .Add "COST_BASIS", 13
+        .Add "CUST_AGMT_TYPE", 14
+        .Add "REBATE_BASIS", 15
+        .Add "PRE_APPROVAL", 16
+        .Add "APPROP_NAME", 17
+        .Add "PRN_GRP", 18
+        .Add "PACKET", 19
+        .Add "PACKET_DL", 20
+        .Add "COMMENTS", 21
+    End With
+
+End Sub
+
+
+'*******************************************************************************
+'Add data validaiton to sheet. Include appropriate drop down list for all
+'restricted fields. BB Format will always include a blank list (field is
+'deactivated).
+'*******************************************************************************
+Sub AddDataValidation()
+
+    'Declare sub variables
+    Dim rngYN As Range
+    Dim rngDrp As Range
+    Dim varRng As Variant
+    Dim iDropLR As Integer
+
+    'Unprotect sheet
+    Utility.ShtUnlock (strSht)
+
+    'Get last row
+    iLRow = LastRow(strSht)
+
+    'Activate programs tab
+    With Sheets(strSht)
+
+        'Remove data validation from sheet
+        .Cells.Validation.Delete
+
+        'Set range for fields which will have Y/N drop down
+        Set rngYN = .Range(.Cells(2, iDAB + 1), .Cells(iLRow, iTime + 1))
+
+        'Create an array of pertinant Excel (Programs) ranges
+        varRng = Array( _
+            .Range(.Cells(2, iTier + 1), .Cells(iLRow, iTier + 1)), _
+            .Range(.Cells(2, iVAType + 1), .Cells(iLRow, iVAType + 1)), _
+            .Range(.Cells(2, iCost + 1), .Cells(iLRow, iCost + 1)), _
+            .Range(.Cells(2, iCAType + 1), .Cells(iLRow, iCAType + 1)), _
+            .Range(.Cells(2, iRebate + 1), .Cells(iLRow, iRebate + 1)), _
+            .Range(.Cells(2, iApprop + 1), .Cells(iLRow, iApprop + 1)), _
+            .Range(.Cells(2, iCst + 1), .Cells(iLRow, iCst + 1)))
+    End With
+
+    'Add Y/N drop down list to first three editable Fields
+    rngYN.Validation.Add xlValidateList, Formula1:="Y,N"
+
+    'Activate DropDowns tab
+    With Sheets(strDrpSht)
+
+        'Loop through each column of DropDowns tab
+        For i = 0 To UBound(varRng)
+
+            'Get last row of dropdown fields (custom columns)
+            iDropLR = .Cells(.Rows.Count, i + 1).End(xlUp).row
+
+            'Save dropdown Range
+            Set rngDrp = .Range(.Cells(2, i + 1), .Cells(iDropLR, i + 1))
+
+            'Add data validation to Excel (Programs) range
+            varRng(i).Validation.Add xlValidateList, _
+                Formula1:="='" & strDrpSht & "'!" & rngDrp.Address
+        Next
+    End With
+
+    'Protect sheet
+    Utility.ShtLock (strSht)
+End Sub

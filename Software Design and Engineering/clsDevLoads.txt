@@ -1,0 +1,280 @@
+
+'Declare private class constants
+Private Const iPKey As Integer = 0
+Private Const iCst As Integer = 1
+Private Const strSht As String = "Deviation Loads"
+Private Const strSaveSht As String = "Deviation Loads (Utility)"
+Private Const strShtx As String = "Recover Deviation Loads"
+Private Const strDb As String = "CAL_Deviation_Loads "
+Private Const strDbx As String = "CAL_Deviation_Loads_Archive "
+Private Const strFldx As String = "PRIMARY_KEY"
+Private Const sql_cols As String = _
+    "CUSTOMER," _
+    & "PROGRAM," _
+    & "OWNER," _
+    & "DATE," _
+    & "SR," _
+    & "GRP "
+Private Const ret_val As String = _
+    "T1.[CUSTOMER]," _
+    & "T1.[PROGRAM]," _
+    & "T1.[OWNER]," _
+    & "T1.[DATE]," _
+    & "T1.[SR]," _
+    & "T1.[GRP] "
+Private Const tbl_cols As String = _
+    "*[CUSTOMER] & " _
+    & "*[PROGRAM] & " _
+    & "*[OWNER] & " _
+    & "*[DATE] & " _
+    & "*[SR] & " _
+    & "*[GRP] "
+
+'Declare private class variables
+Private dictCol As New Scripting.Dictionary
+Private dictType As New Scripting.Dictionary
+Private dictIndex As New Scripting.Dictionary
+Private iRow As Integer
+Private iCol As Integer
+
+
+'*******************************************************************************
+'Property to return sql field names
+'*******************************************************************************
+Public Property Get Sql_Columns() As Variant
+
+    'Return class sheet name
+    Sql_Columns = sql_cols
+End Property
+
+
+'*******************************************************************************
+'Property to return excel field names
+'*******************************************************************************
+Public Property Get Tbl_Columns() As Variant
+
+    'Return class sheet name
+    Tbl_Columns = tbl_cols
+End Property
+
+
+'*******************************************************************************
+'Property to return field names
+'*******************************************************************************
+Public Property Get Return_Val() As Variant
+
+    'Return class sheet name
+    Return_Val = ret_val
+End Property
+
+
+'*******************************************************************************
+'Property to return unique column name from CAL sheet.
+'*******************************************************************************
+Public Property Get Unique_Sht_Col() As String
+
+    'Return class sheet name
+    Unique_Sht_Col = "[PROGRAM]"
+End Property
+
+
+'*******************************************************************************
+'Property to return unique column name from sql server.
+'*******************************************************************************
+Public Property Get Unique_Sql_Col() As String
+
+    'Return class sheet name
+    Unique_Sql_Col = "PROGRAM"
+End Property
+
+
+'*******************************************************************************
+'Property to return class sheet name constant (Deviation Loads)
+'*******************************************************************************
+Public Property Get Name() As String
+
+    'Return class sheet name
+    Name = strSht
+End Property
+
+
+'*******************************************************************************
+'Property to return class database table name constant (CAL_Deviation_Loads)
+'*******************************************************************************
+Public Property Get Tbl() As String
+
+    'Return class database table name
+    Tbl = strDb
+End Property
+
+
+'*******************************************************************************
+'Property to return class archive database table constant.
+'*******************************************************************************
+Public Property Get Tbl_Archive() As String
+
+    'Return class database table name
+    Tbl_Archive = strDbx
+End Property
+
+
+'*******************************************************************************
+'Return all fields of Deviation Loads table
+'*******************************************************************************
+Public Property Get AllFlds() As String
+
+    'Declare property variables
+    Dim strFlds As String
+
+    'Loop through all key of the dictIndex Dictionary
+    For Each Key In dictIndex
+
+        'Assemble String of Fields
+        strFlds = Append(strFlds, ",", Key)
+    Next
+
+    'Return string of all fields
+    AllFlds = strFlds
+End Property
+
+
+'*******************************************************************************
+'Return delete by field.
+'*******************************************************************************
+Public Property Get Fldx() As String
+
+    'Return string of all fields
+    Fldx = strFldx
+End Property
+
+
+'*******************************************************************************
+'Property to return dictionary of class database field indeces(Key) and
+'field names(Item).
+'*******************************************************************************
+Public Property Get Cols() As Scripting.Dictionary
+
+    'Return class database field dictionary
+    Set Cols = dictCol
+End Property
+
+
+'*******************************************************************************
+'Property to return class sheet name constant (Deviation Loads)
+'*******************************************************************************
+Public Property Get Sht() As String
+
+    'Return class sheet name
+    Sht = strSht
+End Property
+
+
+'*******************************************************************************
+'Property to return class background sheet name constant (Deviation Loads)
+'*******************************************************************************
+Public Property Get Save_Sht() As String
+
+    'Return class sheet name
+    Save_Sht = strSaveSht
+End Property
+
+
+'*******************************************************************************
+'Property to return class archive sheet name constant (Deviation Loads)
+'*******************************************************************************
+Public Property Get Shtx() As String
+
+    'Return class sheet name
+    Shtx = strShtx
+End Property
+
+
+'*******************************************************************************
+'Property to return dictionary of class database field names(Key) and
+'field indeces(Item).
+'*******************************************************************************\
+Public Property Get ColIndex() As Scripting.Dictionary
+
+    'Return class database field dictionary
+    Set ColIndex = dictIndex
+End Property
+
+
+'*******************************************************************************
+'Initialize sub. Create dictionaries with column index & name keys
+'*******************************************************************************
+Private Sub Class_Initialize()
+
+    'Assemble dictionary of field indeces(key) and names(item)
+    With dictCol
+        .Add 0, "PRIMARY_KEY"
+        .Add 1, "CUSTOMER"
+        .Add 2, "PROGRAM"
+        .Add 3, "OWNER"
+        .Add 4, "DATE"
+        .Add 5, "SR"
+        .Add 6, "GRP"
+    End With
+
+    'Assemble dictionary of field names(key) and indeces(item)
+    With dictIndex
+        .Add "PRIMARY_KEY", 0
+        .Add "CUSTOMER", 1
+        .Add "PROGRAM", 2
+        .Add "OWNER", 3
+        .Add "DATE", 4
+        .Add "SR", 5
+        .Add "GRP", 6
+    End With
+End Sub
+
+
+'*******************************************************************************
+'Add data validaiton to sheet. Include appropriate drop down list for all
+'restricted fields.
+'*******************************************************************************
+Sub AddDataValidation()
+
+    'Declare sub variables
+    Dim rngCst As Range
+    Dim rngDrp As Range
+    Dim iDropLR As Integer
+
+    'Unprotect sheet
+    Utility.ShtUnlock (strSht)
+
+    'Get last row
+    iLRow = LastRow(strSht) + 1
+
+    'Activate programs tab
+    With Sheets(strSht)
+
+        'Remove data validation from sheet
+        .Cells.Validation.Delete
+
+        'save range to add DropDowns
+        Set rngCst = .Range(.Cells(2, iCst + 1), .Cells(iLRow, iCst + 1))
+
+        'Special text to columns for deviation loads
+        Application.DisplayAlerts = False
+        .Cells(1, dictIndex("DATE") + 1).EntireColumn.TextToColumns
+        Application.DisplayAlerts = True
+    End With
+
+    'Activate DropDowns tab
+    With Sheets(strDrpSht)
+
+        'Get last row of dropdown fields (custom Column)
+        iDropLR = .Cells(.Rows.Count, "G").End(xlUp).row + 1
+
+        'Save dropdown Range
+        Set rngDrp = .Range(.Cells(2, "G"), .Cells(iDropLR, "G"))
+
+        'Add data validation to Excel (Programs) range
+        rngCst.Validation.Add xlValidateList, _
+            Formula1:="='" & strDrpSht & "'!" & rngDrp.Address
+    End With
+
+    'Protect sheet
+    Utility.ShtLock (strSht)
+End Sub
