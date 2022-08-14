@@ -1,0 +1,500 @@
+Attribute VB_Name = "Public_Methods"
+
+'Declare Private variables
+Private CAL As New CAL
+
+
+'*******************************************************************************
+'Add conditional formatting to the Programs tab. Weekly programs are highlighted
+'green and programs expiring EOM are highlighted red.
+'*******************************************************************************
+Sub Conditional_Formatting(sheet_name)
+
+    'Declare sub variables
+    Dim format_range As Range
+    Dim date_range As String
+    Dim start_date As Integer
+    Dim end_date As Integer
+    Dim last_row As Long
+
+    'Activate Programs tab
+    With Sheets(sheet_name)
+    
+        'Get last row of sheet
+        last_row = .UsedRange.Rows.Count + 1
+    
+        'Get column Location
+        start_date = .Rows(1).Find("START DATE").Column
+        end_date = .Rows(1).Find("END DATE").Column
+
+        'Set range to be formatted
+        Set format_range = .Range(.Cells(2, end_date), .Cells(last_row, end_date))
+
+        'Get formula string for weekly highlight (end-iStart)
+        date_range = Replace(.Cells(2, end_date).Address _
+            & "-" & .Cells(2, start_date).Address, "$", "")
+
+        'Clear conditional formatting from range
+        format_range.FormatConditions.Delete
+        
+        'Set conditional formatting for weekly programs
+        format_range.FormatConditions.Add(xlExpression, xlEqual, Formula1:="=(" _
+            & date_range & ")=6").Interior.Color = RGB(137, 191, 101)
+        
+        'Set conditional formatting for standard programs
+        format_range.FormatConditions.Add(xlCellValue, xlLess, "=" & _
+            CLng(DateSerial(Year(Now), Month(Now) + 1, 11))).Interior.Color = _
+            RGB(250, 120, 120)
+    End With
+End Sub
+
+
+'*******************************************************************************
+'Return folder path that does not already exist
+'*******************************************************************************
+Function Validate_Folder(folder_path) As String
+
+    Dim path_counter As Integer
+
+    'Correct folder path if it exists
+    Do While Dir(folder_path, vbDirectory) <> ""
+        path_counter = path_counter + 1
+        If path_counter = 1 Then
+            folder_path = folder_path & "(" & path_counter & ")"
+        Else
+            folder_path = Replace(folder_path, "(" & path_counter - 1, "(" & path_counter)
+        End If
+    Loop
+    
+    Validate_Folder = folder_path
+End Function
+
+
+'*******************************************************************************
+'Fills main three CAL sheets with appropriate data & formats accordingly
+'*******************************************************************************
+Sub Populate_Pages(customers As Variant)
+
+    'Declare sub variables
+    Dim programs As ADODB.Recordset
+    Dim customer_profile As ADODB.Recordset
+    Dim deviation_loads As ADODB.Recordset
+    Dim dab_column As Integer
+    Dim time_column As Integer
+    Dim tier_column As Integer
+    Dim va_type_column As Integer
+    Dim cost_column As Integer
+    Dim ca_type_column As Integer
+    Dim rebate_column As Integer
+    Dim appropriation_column As Integer
+    Dim range_list As Variant
+    Dim yn_range As Range
+    Dim dropdown_range As Range
+    Dim last_row As Long
+    
+    'Pull customer data for each CAL sheet
+    Set programs = Get_Programs(customers)
+    Set customer_profile = Get_Customer_Profile(customers)
+    Set deviation_loads = Get_Deviation_Loads(customers)
+    
+    'Insert programs data
+    If Not programs.EOF Then
+        Refresh_Sheet CAL.Programs_Sheet, programs
+        programs.MoveFirst
+        Refresh_Sheet CAL.Programs_Ref_Sheet, programs
+    End If
+    
+    'Insert customer profile data
+    If Not customer_profile.EOF Then
+        Refresh_Sheet CAL.Customer_Profile_Sheet, customer_profile
+        customer_profile.MoveFirst
+        Refresh_Sheet CAL.Customer_Profile_Ref_Sheet, customer_profile
+    End If
+    
+    'Insert deviation loads data
+    If Not deviation_loads.EOF Then
+        Refresh_Sheet CAL.Deviation_Loads_Sheet, deviation_loads
+        deviation_loads.MoveFirst
+        Refresh_Sheet CAL.Deviation_Loads_Ref_Sheet, deviation_loads
+    End If
+    
+    'Add data validation for customer column
+    Add_Customer_Dropdowns CAL.Programs_Sheet
+    Add_Customer_Dropdowns CAL.Customer_Profile_Sheet
+    Add_Customer_Dropdowns CAL.Deviation_Loads_Sheet
+    
+    'Add data validation (drop down options) and condititional formatting
+    Conditional_Formatting CAL.Programs_Sheet
+    
+    '****Add special data validation for programs tab
+    
+    'Activate programs tab
+    With Sheets(CAL.Programs_Sheet)
+    
+        'Get column locations
+        dab_column = .Rows(1).Find("DAB").Column
+        va_type_column = .Rows(1).Find("VA TYPE").Column
+        cost_column = .Rows(1).Find("COST BASIS").Column
+        ca_type_column = .Rows(1).Find("CA TYPE").Column
+        rebate_column = .Rows(1).Find("REBATE BASIS").Column
+        appropriation_column = .Rows(1).Find("APPROP NAME").Column
+        
+        'Set range for fields which will have Y/N drop down
+        Set yn_range = .Cells(2, dab_column).EntireColumn
+
+        'Create an array of pertinant Excel (Programs) ranges
+        range_list = Array( _
+            .Cells(2, va_type_column).EntireColumn, _
+            .Cells(2, cost_column).EntireColumn, _
+            .Cells(2, ca_type_column).EntireColumn, _
+            .Cells(2, rebate_column).EntireColumn, _
+            .Cells(2, appropriation_column).EntireColumn)
+    End With
+
+    'Add Y/N drop down list to first three editable Fields
+    yn_range.Validation.Add xlValidateList, Formula1:="Y,N"
+
+    'Activate DropDowns tab
+    With Sheets(CAL.DropDown_Sheet)
+
+        'Loop through each column of DropDowns tab
+        For i = 0 To UBound(range_list)
+
+            'Get last row of dropdown fields (custom columns)
+            last_row = .Cells(.Rows.Count, i + 1).End(xlUp).Row
+
+            'Save dropdown Range
+            Set dropdown_range = .Range(.Cells(2, i + 1), .Cells(last_row, i + 1))
+
+            'Add data validation to Excel (Programs) range
+            range_list(i).Validation.Add xlValidateList, _
+                Formula1:="='" & CAL.DropDown_Sheet & "'!" & dropdown_range.Address
+        Next
+    End With
+End Sub
+
+
+'*******************************************************************************
+'Add dropdown for list of assigned customers
+'*******************************************************************************
+Sub Add_Customer_Dropdowns(sheet_name As Variant)
+
+    'Declare sub variables
+    Dim customer_range As Range
+    Dim dropdown_range As Range
+    Dim last_row As Long
+    Dim customer_column As Integer
+    
+    'Focus on passthrough sheet
+    With Sheets(sheet_name)
+        
+        'FInd customer column
+        customer_column = .Rows(1).Find("CUSTOMER").Column
+        
+        'Remove data validation from sheet
+        .Cells.Validation.Delete
+
+        'save range to add DropDowns
+        Set customer_range = .Cells(2, customer_column).EntireColumn
+    End With
+    
+    'Focus on dropdown sheet
+    With Sheets(CAL.DropDown_Sheet)
+        
+        'Find last row
+        last_row = .Cells(.Rows.Count, .Rows(1).Find("ASSIGNED").Column).End(xlUp).Row
+        
+        'Save dropdown range
+        Set dropdown_range = .Range(.Cells(2, "G"), .Cells(last_row, "G"))
+    End With
+    
+    'Add data validation to Excel (Programs) range
+    customer_range.Validation.Add xlValidateList, _
+        Formula1:="='" & CAL.DropDown_Sheet & "'!" & dropdown_range.Address
+End Sub
+
+
+'*******************************************************************************
+'Delete old sheet detail and paste new. Parameters are sheet name and open
+'recordset.
+'*******************************************************************************
+Sub Refresh_Sheet(sheet_name As String, dataset As ADODB.Recordset)
+
+    'Declare sub variable
+    Dim last_row As Long
+
+    'Clear previous sheet content and paste new
+    With Sheets(sheet_name)
+    
+        'Get last row of sheet
+        last_row = .UsedRange.Rows.Count + 1
+        
+        'Unlfiter if needed
+        If .FilterMode Then .ShowAllData
+        
+        'Paste recordset
+        .Cells(last_row, 1).CopyFromRecordset dataset
+    End With
+
+    'Add borders
+    Format_Report sheet_name
+End Sub
+
+
+'*******************************************************************************
+'Format table with gray headers, bold white font, white cells, and borders.
+'*******************************************************************************
+Function Get_First_Row(sheet_name)
+
+    'Declare sub variables
+    Dim first_row As Integer
+    
+    'Focus on desired sheet
+    With Sheets(sheet_name)
+    
+        'If merged header, set first row to 3, otherwise, first row is 2
+        If .Cells(1, 1).MergeCells Then
+            first_row = 3
+        Else
+            first_row = 2
+        End If
+    End With
+
+    'Return first row
+    Get_First_Row = first_row
+End Function
+
+
+'*******************************************************************************
+'Format table with gray headers, bold white font, white cells, and borders.
+'*******************************************************************************
+Sub Format_Report(sheet_name)
+    
+    'Declare sub variables
+    Dim last_row As Long
+    Dim last_column As Integer
+    Dim first_row As Integer
+    
+    'Focus on passthrough sheet
+    With Sheets(sheet_name)
+     
+        'Find first/last row and last column and assign to variables
+        first_row = Get_First_Row(.Name)
+        last_row = .UsedRange.Rows.Count
+        last_column = .UsedRange.Columns.Count
+        
+        'Color all cells white
+        .Cells.Interior.Color = vbWhite
+        
+        'Format headers
+        With .Range(.Cells(1, 1), .Cells(first_row - 1, last_column))
+            .Font.Color = vbWhite
+            .Font.Bold = True
+            .Interior.Color = RGB(64, 64, 64)
+            .HorizontalAlignment = xlLeft
+        End With
+        
+        'Format table range
+        With .Range(.Cells(first_row - 1, 1), .Cells(last_row, last_column))
+            .Borders.LineStyle = xlContinuous
+            .ColumnWidth = 100
+        End With
+        
+        'resize columns/rows
+        .Columns.AutoFit
+        .Rows.AutoFit
+        
+        'Hide column A if CAL sheet
+        If .Cells(first_row - 1, 1).Value = "PRIMARY_KEY" Then .Columns(1).Hidden = True
+    End With
+End Sub
+
+
+Sub Download_Programs(customer)
+
+    Dim CAL As New CAL
+
+    'Create customer friendly CAL Workbook and set to variable
+    ThisWorkbook.Sheets(CAL.Programs_Sheet).Copy
+    
+    'Clear data from sheet
+    Clear_Sheets "Programs"
+    
+    'Populate customer records
+    Cells(2, 1).CopyFromRecordset Pull.Get_Programs("'" & customer & "'")
+    
+    'Rename customer to exclude special characters
+    customer = Replace(customer, "/", "-")
+    
+    'Name first sheet of workbook
+    Sheets(1).Name = Replace(customer, "/", "-")
+        
+    'Add conditional formatting
+    Conditional_Formatting customer
+    
+    'Format sheet
+    Format_Report customer
+End Sub
+
+
+'*******************************************************************************
+'Clear data from sheets - given sheet name can be string or array.
+'*******************************************************************************
+Sub Clear_Sheets(sheet_list)
+
+    'Declare sub variables
+    Dim i As Integer
+        
+    'If passthrough variable contains list of sheets
+    If IsArray(sheet_list) Then
+        
+        'Loop through Sheets
+        For i = 0 To UBound(sheet_list)
+            
+            'Delete recordse
+            Delete_Records sheet_list(i)
+        Next
+    
+    'If passthrough variable contains single sheet
+    Else
+    
+        'Delete records
+        Delete_Records sheet_list
+    End If
+End Sub
+
+
+'*******************************************************************************
+'Prompt user to select a folder, create new folder, return folder path.
+'*******************************************************************************
+Function Select_Folder() As String
+
+    'Declare function variables
+    Dim folder_pi As FileDialog
+    Dim folder_path As String
+
+    'Setup file dialog picker
+    Set folder_picker = Application.FileDialog(msoFileDialogFolderPicker)
+    
+    'Open dialog settings
+    With folder_picker
+    
+        'Set title and settings
+        .Title = "Select Folder Location"
+        .AllowMultiSelect = False
+        
+        'Show dialog and save path to string
+        If .Show = -1 Then folder_path = .SelectedItems(1)
+    End With
+    
+    'If path was selected then return selected folder
+    If folder_path <> "" Then Select_Folder = folder_path & "\"
+End Function
+
+
+'*******************************************************************************
+'Dependent of the Clear_Sheets sub. Deletes data from given sheet.
+'*******************************************************************************
+Private Sub Delete_Records(sheet_name)
+
+    'Declare sub variables
+    Dim first_row As Long
+    Dim last_row As Long
+
+    'Focus on sheet
+    With Sheets(sheet_name)
+               
+        'Set first Row
+        first_row = Get_First_Row(.Name)
+        
+        If .FilterMode Then .ShowAllData
+        last_row = .UsedRange.Rows.Count + 1
+        .Range("A" & first_row & ":A" & last_row).EntireRow.Delete
+    End With
+End Sub
+
+
+'*******************************************************************************
+'Return next month and year
+'*******************************************************************************
+Function Next_Month() As String
+
+    'Declare function variables
+    Dim month_name As String
+    Dim year_number As Integer
+
+    'Get month and year
+    month_name = MonthName(Month(DateAdd("m", 1, Date)))
+    year_number = Year(DateSerial(Year(Now), Month(Now) + 1, 1))
+
+    'Return month and year
+    Next_Month = month_name & " " & year_number
+End Function
+
+
+'*******************************************************************************
+'Returns user's network ID
+'*******************************************************************************
+Function Get_ID() As String
+
+    'Declare function variables
+    Get_ID = Environ("Username")
+End Function
+
+
+'*******************************************************************************
+'Returns user's name
+'*******************************************************************************
+Function Get_Name() As String
+
+    'Declare function variables
+    Get_Name = Application.UserName
+End Function
+
+
+'*******************************************************************************
+'Returns a concatenated string with separator.
+'*******************************************************************************
+Function Append(val As Variant, sep As Variant, _
+    val2 As Variant) As String
+
+    'If value is blank
+    If val = "" Then
+
+        'Return blank variable
+        Append = val2
+    Else
+
+        'Return concatenated value and separator
+        Append = val & sep & val2
+    End If
+End Function
+
+
+'*******************************************************************************
+'Transpose multidimenstional array from recordset to for Excel pasting.
+'*******************************************************************************
+Function Transpose(source_list As Variant) As Variant
+
+    'Declare function variables
+    Dim transpose_list As Variant
+    Dim row_num As Long
+    Dim column_num As Integer
+    
+    'Resize transposed array to the proper size (using passthrough array)
+    ReDim transpose_list(UBound(source_list, 2), UBound(source_list, 2))
+    
+    'Loop through each row in passthrough array
+    For row_num = 0 To UBound(source_list, 2)
+    
+        'Loop through each column in passthrough array
+        For column_num = 0 To UBound(source_list, 1)
+            
+            'Transpose passthrough array iteration to new array location
+            transpose_list(row_num, column_num) = var(column_num, row_num)
+        Next
+    Next
+    
+    'Return transposed array
+    Transpose = transpose_list
+End Function

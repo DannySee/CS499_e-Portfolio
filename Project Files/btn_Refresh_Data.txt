@@ -1,0 +1,84 @@
+Attribute VB_Name = "btn_Refresh_Data"
+
+
+'*******************************************************************************
+'Get fresh data directly from server. Delete old records, replace with new &
+'format accordingly. Runs across main tabs. Test final
+'*******************************************************************************
+Sub Refresh_Data_Initialize()
+
+    'Declare sub variables
+    Dim my_customers As String
+    Dim my_customer_list As Variant
+    Dim other_customer_list As Variant
+    Dim associate_list As Variant
+    Dim dropdown_list As Variant
+    Dim CAL As New CAL
+    Dim row_num As Integer
+    Dim col_num As Integer
+    Dim last_row As Integer
+    
+    'Show loading icon
+    Loading.Show 0
+    DoEvents
+    
+    'Freeze Screen updating
+    Application.ScreenUpdating = False
+    Application.EnableEvents = False
+    
+    'Clear data from sheets. Parameters: all sheets + header row
+    Clear_Sheets CAL.Sheets
+
+    'Get String of my customer names
+    dropdown_list = Get_Dropdowns
+    associate_list = Get_Associate_Name
+    other_customer_list = Get_Customers(False)
+    my_customer_list = Get_Customers(True)
+    
+    'Focus on dropdowns sheet
+    With ThisWorkbook.Sheets(CAL.DropDown_Sheet)
+    
+         'Loop through rows in dropdown multidimensional array
+        For row_num = 0 To UBound(dropdown_list, 2)
+        
+            'Get dropdown column
+            col_num = dropdown_list(1, row_num)
+            
+            'Set last row
+            last_row = .Cells(.Rows.Count, col_num).End(xlUp).Row + 1
+            
+            'Paste dropdowns in appropriate columns
+            .Cells(last_row, col_num).Value = dropdown_list(0, row_num)
+        Next
+        
+        'Insert assigned customer list
+        If IsEmpty(my_customer_list) Then
+            .Range("F2").Value = "(Blank)"
+        Else
+            .Range("F2:F" & UBound(my_customer_list) + 2).Value = Application.Transpose(my_customer_list)
+        End If
+        
+        'Insert unassigned customer list
+        .Range("G2:G" & UBound(other_customer_list) + 2).Value = Application.Transpose(other_customer_list)
+    
+        'Insert associate list
+        .Range("H2:H" & UBound(associate_list) + 2).Value = Application.Transpose(associate_list)
+    End With
+        
+    'Create string of assigned customers to query customer data
+    If IsEmpty(my_customer_list) Then
+        my_customers = "''"
+    Else
+        my_customers = "'" & Join(my_customer_list, "','") & "'"
+    End If
+    
+    'populate CAL sheets with refreshed data
+    Populate_Pages my_customers
+        
+    'Reset screen updating options
+    Application.ScreenUpdating = True
+    Application.EnableEvents = True
+    
+    'hide loading icon
+    Unload Loading
+End Sub

@@ -1,0 +1,66 @@
+Attribute VB_Name = "Context_Controls"
+
+
+'*******************************************************************************
+'Create a report with
+'*******************************************************************************
+Sub ViewEligibility()
+
+    'Declare sub variables
+    Dim varHeaders As Variant
+    Dim iRow As Integer
+    Dim strVA As String
+    Dim strCA As String
+    Dim strSht As String
+    
+    'Show loading icon
+    Loading.Show 0
+    DoEvents
+    
+    'Freeze screen settings
+    Application.ScreenUpdating = False
+    
+    'Save row selection to variable
+    iRow = selection.Row
+    
+    'Get VA/CA/Sheet name from selected row
+    strVA = "'000" & Cells(iRow, oPrgms.ColIndex("LEAD_VA") + 1) & "'"
+    strCA = "'000" & Cells(iRow, oPrgms.ColIndex("LEAD_CA") + 1) & "'"
+    strSht = Cells(iRow, oPrgms.ColIndex("LEAD_VA") + 1).Value & "|" _
+        & Cells(iRow, oPrgms.ColIndex("LEAD_CA") + 1).Value
+    
+    'Create new Workbook w/ formatting
+    CreateWorkbook (strSht)
+
+    'Get array of headers
+    varHeaders = Array("IEA", "SPEC", "CUSTOMER", "CUSTOMER DESCRIPTION")
+
+    'Add headers to Workbook
+    AddHeaders (varHeaders)
+    
+    'Query customer records and paste to sheet
+    Cells(2, 1).CopyFromRecordset Pull.Get_Eligibility(strVA, strCA)
+    
+    'If no records were pasted from query
+    If Cells(2, 1).Value = "" Then
+        
+        'Indicate no records were found
+        Cells(2, 1).Value = "No records found."
+    
+    'If records were found
+    Else
+
+        'Add borders to Workbook
+        AddBorders (strSht)
+        
+        'Resize rows and column
+        ResizeSht (strSht)
+    End If
+    
+    'Reset screen settings
+    Application.ScreenUpdating = True
+    
+    'hide loading icon
+    Unload Loading
+End Sub
+

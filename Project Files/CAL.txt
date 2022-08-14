@@ -1,0 +1,139 @@
+VERSION 1.0 CLASS
+BEGIN
+  MultiUse = -1  'True
+END
+Attribute VB_Name = "CAL"
+Attribute VB_GlobalNameSpace = False
+Attribute VB_Creatable = False
+Attribute VB_PredeclaredId = False
+Attribute VB_Exposed = False
+
+'Declare private class constants
+Private Const sheet_programs As String = "Programs"
+Private Const sheet_programs_ref As String = "Programs Reference"
+Private Const sheet_customer_profile As String = "Customer Profile"
+Private Const sheet_customer_profile_ref As String = "Customer Profile Reference"
+Private Const sheet_deviation_loads As String = "Deviation Loads"
+Private Const sheet_deviation_loads_ref As String = "Deviation Loads Reference"
+Private Const sheet_dropdown As String = "DropDowns"
+Private Const sheet_account_assignments As String = "Account Assignments"
+Private Const sheet_gpo_matrix As String = "GPO Matrix"
+
+'Declare private class variables
+Private sheet_list As Variant
+Private headers_dropdown As Variant
+
+
+'*******************************************************************************
+'Return all sheets in sheet_list array.
+'*******************************************************************************
+Property Get Sheets() As Variant
+
+    'Set property to array
+    Sheets = sheet_list
+End Property
+
+
+'*******************************************************************************
+'Return GPO matrix sheet name.
+'*******************************************************************************
+Property Get GPO_Matrix_Sheet() As Variant
+
+    'Set property to array
+    GPO_Matrix_Sheet = sheet_gpo_matrix
+End Property
+
+'*******************************************************************************
+'Return account assignment sheet name.
+'*******************************************************************************
+Property Get Account_Assignment_Sheet() As String
+
+    'Set property to array
+    Account_Assignment_Sheet = sheet_account_assignments
+End Property
+
+
+'*******************************************************************************
+'Return programs sheet name.
+'*******************************************************************************
+Property Get Programs_Sheet() As String
+
+    'Set property to sheet name
+    Programs_Sheet = sheet_programs
+End Property
+
+
+'*******************************************************************************
+'Return programs reference sheet name.
+'*******************************************************************************
+Property Get Programs_Ref_Sheet() As String
+
+    'Set property to sheet name
+    Programs_Ref_Sheet = sheet_programs_ref
+End Property
+
+
+'*******************************************************************************
+'Return customer profile sheet name.
+'*******************************************************************************
+Property Get Customer_Profile_Sheet() As String
+
+    'Set property to sheet name
+    Customer_Profile_Sheet = sheet_customer_profile
+End Property
+
+
+'*******************************************************************************
+'Return customer profile reference sheet name.
+'*******************************************************************************
+Property Get Customer_Profile_Ref_Sheet() As String
+
+    'Set property to sheet name
+    Customer_Profile_Ref_Sheet = sheet_customer_profile_ref
+End Property
+
+
+'*******************************************************************************
+'Return deviation loads sheet name.
+'*******************************************************************************
+Property Get Deviation_Loads_Sheet() As String
+
+    'Set property to sheet name
+    Deviation_Loads_Sheet = sheet_deviation_loads
+End Property
+
+
+'*******************************************************************************
+'Return deviation loads reference sheet name.
+'*******************************************************************************
+Property Get Deviation_Loads_Ref_Sheet() As String
+
+    'Set property to sheet name
+    Deviation_Loads_Ref_Sheet = sheet_deviation_loads_ref
+End Property
+
+
+'*******************************************************************************
+'Return dropdown sheet name.
+'*******************************************************************************
+Property Get DropDown_Sheet() As String
+
+    'Set property to sheet name
+    DropDown_Sheet = sheet_dropdown
+End Property
+
+
+'*******************************************************************************
+'Initialize sub. Create dictionaries with column index & name keys
+'*******************************************************************************
+Private Sub Class_Initialize()
+
+    sheet_list = Array( _
+        sheet_programs, _
+        sheet_programs_ref, _
+        sheet_customer_profile, _
+        sheet_customer_profile_ref, _
+        sheet_deviation_loads, _
+        sheet_deviation_loads_ref, _
+        sheet_dropdown)
+End Sub

@@ -1,0 +1,204 @@
+VERSION 1.0 CLASS
+BEGIN
+  MultiUse = -1  'True
+END
+Attribute VB_Name = "AdoConnection"
+Attribute VB_GlobalNameSpace = False
+Attribute VB_Creatable = False
+Attribute VB_PredeclaredId = False
+Attribute VB_Exposed = False
+'Setup class module constants
+Const strExcel As String = _
+    "Provider=Microsoft.Jet.OLEDB.4.0;" & _
+    "Data Source=*;" & _
+    "Extended Properties='Excel 8.0;HDR=Yes'"
+    
+'Declare variables that can be used in all subs within this class module.
+Private dctSites As New Scripting.Dictionary
+Private varSouth As Variant
+Private varNorth As Variant
+Private varWest As Variant
+Private strSUS As String
+
+
+'Return Thisworkbook Excel ADO connection string
+Public Property Get this_workbook() As String
+    this_workbook = Replace(strExcel, "*", ThisWorkbook.FullName)
+End Property
+
+
+'Return ActiveWorkbook Excel ADO connection string
+Public Property Get active_workbook() As String
+    active_workbook = Replace(strExcel, "*", ActiveWorkbook.FullName)
+End Property
+
+Public Property Get sql_server() As String
+    sql_server = "DRIVER=SQL Server;SERVER=MS248CSSQL01;DATABASE=Pricing_Agreements;"
+End Property
+
+
+'Return Excel ADO connection string for any excel file
+Public Property Get Book(Filename As String) As String
+    Book = Replace(strExcel, "*", Filename)
+End Property
+
+
+'Return SUS ADO connection string for any Opsite (as...a driver config)
+Public Property Get SUS(opsite As Variant) As String
+
+    Dim cnn As New ADODB.Connection
+    Dim iErr As Integer
+    
+    On Error GoTo ErrHandler
+    cnn.Open "DSN=AS" & opsite & "A;UID=" & Get_Login_ID & ";PWD=" & get_password & ";"
+    SUS = "DSN=AS" & opsite & "A;UID=" & Get_Login_ID & ";PWD=" & get_password & ";"
+    
+    Exit Property
+ErrHandler:
+    If iErr < 2 Then
+        UserLog.Show
+        iErr = iErr + 1
+        Resume
+    Else
+        MsgBox "Unable to reach OpSite - Please validate password/ODBC drivers and try again."
+        End
+    End If
+End Property
+
+'Return all opsites in array form
+Public Property Get AllSites() As Variant
+    AllSites = dctSites.Keys
+End Property
+
+'Return 3 digit site number given site name/number
+Public Property Get site(opsite) As String
+    site = dctSites(opsite)
+End Property
+
+'Return array of sites within North market
+Public Property Get North() As Variant
+    North = varNorth
+End Property
+
+'Return array of sites within South market
+Public Property Get South() As Variant
+    South = varSouth
+End Property
+
+'Return array of sites within West market
+Public Property Get West() As Variant
+    West = varWest
+End Property
+
+
+'Setup all connectionstrings. NOTE: * is a wildcard to be replaced in public property
+Private Sub Class_Initialize()
+
+    With dctSites
+        .Add "001 - Jackson", "001"
+        .Add "002 - Atlanta", "002"
+        .Add "003 - Jacksonville", "003"
+        .Add "004 - Central California (Modesto)", "004"
+        .Add "005 - Intermountain (UT)", "005"
+        .Add "006 - Dallas (North Texas)", "006"
+        .Add "007 - Virginia", "007"
+        .Add "008 - Northern New England", "008"
+        .Add "009 - Pittsburgh", "009"
+        .Add "010 - East Maryland (Lankford)", "010"
+        .Add "011 - Lousiville", "011"
+        .Add "012 - Baltimore (Smelkinson)", "012"
+        .Add "013 - Central TX (San Antonio & Austin)", "013"
+        .Add "014 - Memphis (Hardins)", "014"
+        .Add "015 - Cleveland", "015"
+        .Add "016 - South Florida (Miami)(Medley)", "016"
+        .Add "017 - Las Vegas", "017"
+        .Add "018 - Baraboo (Winsconsin)", "018"
+        .Add "019 - Cincinnati", "019"
+        .Add "022 - Central Florida (Ocoee)", "022"
+        .Add "023 - New Orleans", "023"
+        .Add "024 - Chicago", "024"
+        .Add "025 - Albany", "025"
+        .Add "026 - Oklahoma", "026"
+        .Add "027 - Syracuse", "027"
+        .Add "029 - Arkansas", "029"
+        .Add "031 - Sacramento", "031"
+        .Add "032 - S.E. Florida", "032"
+        .Add "035 - East Wisconsin", "035"
+        .Add "036 - San Diego", "036"
+        .Add "037 - West Coast Florida (Palmetto)", "037"
+        .Add "038 - Indianapolis", "038"
+        .Add "039 - Iowa", "039"
+        .Add "040 - Idaho", "040"
+        .Add "043 - Montana", "043"
+        .Add "045 - Los Angeles", "045"
+        .Add "046 - Central Alabama (Birmingham)", "046"
+        .Add "047 - Minnesota", "047"
+        .Add "048 - Charlotte", "048"
+        .Add "049 - Arizona", "049"
+        .Add "050 - San Francisco", "050"
+        .Add "051 - Central PA", "051"
+        .Add "052 - Portland", "052"
+        .Add "054 - Connecticut", "054"
+        .Add "055 - Seattle (Washington)", "055"
+        .Add "056 - Boston (Hallsmith)", "056"
+        .Add "057 - Kansas City", "057"
+        .Add "058 - Detroit", "058"
+        .Add "059 - Denver", "059"
+        .Add "060 - Nashville (Robert Orr)", "060"
+        .Add "061 - Nebraska (Lincoln)(Pegler) ", "061"
+        .Add "064 - St. Louis", "064"
+        .Add "066 - New Mexico  (Nobel) ", "066"
+        .Add "067 - Houston", "067"
+        .Add "068 - Grand Rapids", "068"
+        .Add "073 - Hampton Roads (VA)", "073"
+        .Add "075 - Philadelphia", "075"
+        .Add "076 - Metro New York", "076"
+        .Add "078 - West Texas (Watson)(Lubbock)", "078"
+        .Add "101 - Ventura", "101"
+        .Add "102 - Spokane", "102"
+        .Add "134 - Int'l Food Group (IFG)-Tampa", "134"
+        .Add "137 - Columbia", "137"
+        .Add "163 - Raleigh", "163"
+        .Add "164 - Gulf Coast", "164"
+        .Add "194 - Central Illinois (Roberts)", "194"
+        .Add "195 - North Dakota", "195"
+        .Add "288 - Knoxville", "288"
+        .Add "293 - East Texas", "293"
+        .Add "306 - Long Island", "306"
+        .Add "320 - Riverside", "320"
+        .Add "332 - Western Minnesota", "332"
+        .Add "344 - Int'l Food Group (IFG)-Jacksonville", "344"
+        .Add "429 - Doerle", "429"
+        .Add "450 - Alaska (NO DPM)", "450"
+    End With
+    
+    varNorth = Array("007 - Virginia", "008 - Northern New England", _
+        "009 - Pittsburgh", "011 - Lousiville", "012 - Baltimore (Smelkinson)", _
+        "015 - Cleveland", "018 - Baraboo (Winsconsin)", "019 - Cincinnati", _
+        "024 - Chicago", "025 - Albany", "027 - Syracuse", "035 - East Wisconsin", _
+        "038 - Indianapolis", "039 - Iowa", "047 - Minnesota", "051 - Central PA", _
+        "054 - Connecticut", "056 - Boston (Hallsmith)", "058 - Detroit", _
+        "064 - St. Louis", "068 - Grand Rapids", "075 - Philadelphia", _
+        "076 - Metro New York", "194 - Central Illinois (Roberts)", _
+        "195 - North Dakota", "306 - Long Island", "332 - Western Minnesota")
+        
+    varSouth = Array("001 - Jackson", "002 - Atlanta", "003 - Jacksonville", _
+        "006 - Dallas (North Texas)", "010 - East Maryland (Lankford)", _
+        "013 - Central TX (San Antonio & Austin)", "014 - Memphis (Hardins)", _
+        "016 - South Florida (Miami)(Medley)", "022 - Central Florida (Ocoee)", _
+        "023 - New Orleans", "026 - Oklahoma", "029 - Arkansas", "032 - S.E. Florida", _
+        "037 - West Coast Florida (Palmetto)", "046 - Central Alabama (Birmingham)", _
+        "048 - Charlotte", "060 - Nashville (Robert Orr)", "067 - Houston", _
+        "073 - Hampton Roads (VA)", "078 - West Texas (Watson)(Lubbock)", _
+        "137 - Columbia", "163 - Raleigh", "164 - Gulf Coast", "288 - Knoxville", _
+        "293 - East Texas", "429 - Doerle")
+        
+    varWest = Array("004 - Central California (Modesto)", "005 - Intermountain (UT)", _
+        "017 - Las Vegas", "031 - Sacramento", "036 - San Diego", "040 - Idaho", _
+        "043 - Montana", "045 - Los Angeles", "049 - Arizona", "050 - San Francisco", _
+        "052 - Portland", "055 - Seattle (Washington)", "057 - Kansas City", _
+        "059 - Denver", "061 - Nebraska (Lincoln)(Pegler)", "066 - New Mexico  (Nobel)", _
+        "101 - Ventura", "102 - Spokane", "320 - Riverside", "450 - Alaska (NO DPM)")
+End Sub
+
+

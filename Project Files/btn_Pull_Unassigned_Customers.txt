@@ -1,0 +1,42 @@
+Attribute VB_Name = "btn_Pull_Unassigned_Customers"
+
+
+'*******************************************************************************
+'Show all utility elements, update and resize listbox.
+'*******************************************************************************
+Private Sub Pull_Unassigned_Customers_Initialize()
+
+    Pull_Unassigned_Customers.Show
+End Sub
+
+
+'*******************************************************************************
+'Pull in selected customer data. Update dropwdowns, Programs, Customer Profiel,
+'and Deviation Loads sheets.
+'*******************************************************************************
+Sub Pull_Unassigned_Customers_Select(customers As Variant)
+
+    'Declare sub variables
+    Dim new_customers As String
+    
+    'Show loading icon
+    Loading.Show 0
+    DoEvents
+    
+    'Freeze Screen updating
+    Application.ScreenUpdating = False
+    Application.EnableEvents = False
+
+    'Create string of assigned customers to query customer data
+    new_customers = "'" & Join(customers, "','") & "'"
+
+    'Populate CAL sheets with refreshed data
+    Populate_Pages new_customers
+    
+    'Unfreeze screen updating
+    Application.ScreenUpdating = True
+    Application.EnableEvents = True
+    
+    'hide loading icon
+    Unload Loading
+End Sub

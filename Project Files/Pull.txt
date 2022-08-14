@@ -1,0 +1,783 @@
+Attribute VB_Name = "Pull"
+
+'Declare private variables
+Private ado As New AdoConnection
+Private CAL As New CAL
+
+'*******************************************************************************
+'Query programs tab. Parameter is the user's network ID. Only pulls assigned
+'customers. Returns open recordset
+'*******************************************************************************
+Function Get_Programs(customers) As ADODB.Recordset
+
+    'Declare function variables
+    Dim cnn As New ADODB.Connection
+    Dim rst As New ADODB.Recordset
+
+    'Establish connection to SQL server
+    cnn.Open ado.sql_server
+        
+    'Query program data for assigned customers
+    rst.Open "SELECT * " _
+        & "FROM CAL_Programs " _
+        & "WHERE CUSTOMER IN (" & customers & ") " _
+        & "ORDER BY CUSTOMER, PROGRAM_DESCRIPTION", cnn
+    
+    'Return query results
+    Set Get_Programs = rst
+End Function
+
+
+'*******************************************************************************
+'Query programs tab. Parameter is the user's network ID. Only pulls assigned
+'customers. Returns open recordset
+'*******************************************************************************
+Function Get_Programs_GPO(customers) As ADODB.Recordset
+
+    'Declare function variables
+    Dim cnn As New ADODB.Connection
+    Dim rst As New ADODB.Recordset
+
+    'Establish connection to SQL server
+    cnn.Open ado.sql_server
+        
+    'Query program data for assigned customers
+    rst.Open "SELECT CUSTOMER, " _
+        & "PROGRAM_DESCRIPTION, " _
+        & "LEAD_VA, " _
+        & "LEAD_CA " _
+        & "FROM CAL_Programs " _
+        & "WHERE CUSTOMER IN (" & customers & ") " _
+        & "ORDER BY CUSTOMER, PROGRAM_DESCRIPTION", cnn
+    
+    'Return query results
+    Set Get_Programs_GPO = rst
+End Function
+
+
+'*******************************************************************************
+'Query deleted records. Only pulls assigned customers or records deleted
+'by user.
+'*******************************************************************************
+Function Get_Deleted_Records(customer As String, table As String) As ADODB.Recordset
+
+    'Declare function variables
+    Dim cnn As New ADODB.Connection
+    Dim rst As New ADODB.Recordset
+
+    'Establish connection to SQL server
+    cnn.Open ado.sql_server
+
+    'Query deleted records for assigned customers
+    rst.Open "SELECT * " _
+        & "FROM " & table & " " _
+        & "WHERE (CUSTOMER IN (" & customer & ")" _
+        & "OR DEL_USER = '" & Get_Name & "') " _
+        & "AND CUSTOMER <> '' " _
+        & "AND CUSTOMER IS NOT NULL " _
+        & "ORDER BY CUSTOMER ", cnn
+
+    'Return query results
+    Set Get_Deleted_Records = rst
+End Function
+
+
+'*******************************************************************************
+'Query programs tab. Parameter is the user's network ID. Only pulls assigned
+'customers. Returns open recordset.
+'*******************************************************************************
+Function Get_Expired_Progragrams(customers) As ADODB.Recordset
+
+    'Declare function variables
+    Dim cnn As New ADODB.Connection
+    Dim rst As New ADODB.Recordset
+
+    'Establish connection to SQL server
+    cnn.Open ado.sql_server
+
+    'Pull expiring contracts
+    rst.Open "SELECT PROGRAM_DESCRIPTION " _
+        & "FROM CAL_Programs " _
+        & "WHERE CUSTOMER = '" & customers & "' " _
+        & "AND VENDOR_NUM <> 1 " _
+        & "AND END_DATE < " & CLng(DateSerial(Year(Now), Month(Now) + 1, 1)) & " " _
+        & "ORDER BY PROGRAM_DESCRIPTION", cnn
+
+    'Return query results
+    Set Get_Expired_Progragrams = rst
+End Function
+
+
+'*******************************************************************************
+'Query Customer Profile tab. Parameter is the user's network ID. Only pulls
+'assigned customers. Returns open recordset
+'*******************************************************************************
+Function Get_Customer_Profile(customers) As ADODB.Recordset
+
+    'Declare function variables
+    Dim cnn As New ADODB.Connection
+    Dim rst As New ADODB.Recordset
+
+    'Establish connection to SQL server
+    cnn.Open ado.sql_server
+
+    'Query customer profile data for assigned customers
+    rst.Open "SELECT DISTINCT * " _
+        & "FROM CAL_Customer_Profile " _
+        & "WHERE CUSTOMER IN (" & customers & ") " _
+        & "ORDER BY CUSTOMER", cnn
+
+    'Return query results
+    Set Get_Customer_Profile = rst
+End Function
+
+
+'*******************************************************************************
+'Query Deviation Loads tab. Parameter is the user's network ID. Only pulls
+'assigned customers. Returns open recordset
+'*******************************************************************************
+Function Get_Deviation_Loads(customers) As ADODB.Recordset
+
+    'Declare function variables
+    Dim cnn As New ADODB.Connection
+    Dim rst As New ADODB.Recordset
+
+    'Establish connection to SQL server
+    cnn.Open ado.sql_server
+
+    'Query deviation load data for assigned customers
+    rst.Open "SELECT * " _
+        & "FROM CAL_Deviation_Loads " _
+        & "WHERE CUSTOMER IN (" & customers & ") " _
+        & "ORDER BY CUSTOMER, PROGRAM", cnn, adOpenStatic
+
+    'Return query results
+    Set Get_Deviation_Loads = rst
+End Function
+
+
+'*******************************************************************************
+'Query all drop down list data. Returns multidimensional array
+'*******************************************************************************
+Function Get_Dropdowns() As Variant
+
+    'Declare function variables
+    Dim cnn As New ADODB.Connection
+    Dim rst As New ADODB.Recordset
+
+    'Establish connection to SQL server
+    cnn.Open ado.sql_server
+    
+    'Query drop down option list
+    rst.Open "SELECT DROP_DOWN, COLUMN_NUM " _
+        & "FROM CAL_Dropdowns", cnn
+
+    'Return multidimensional array of drop down list data
+    Get_Dropdowns = rst.GetRows
+End Function
+
+
+'*******************************************************************************
+'Query all  customer names. Parameter is user's network ID. Returns
+'array of customer names
+'*******************************************************************************
+Function Get_Customers(my_customers As Boolean) As Variant
+
+    'Declare function variables
+    Dim cnn As New ADODB.Connection
+    Dim rst As New ADODB.Recordset
+    Dim ret_val As String
+    Dim operator As String
+
+    'Establish connection to SQL server
+    cnn.Open ado.sql_server
+
+    'Set equal character
+    If my_customers = False Then
+        operator = "<>"
+    Else
+        operator = "="
+    End If
+
+    'Query all assigned customer names
+    rst.Open "SELECT CUSTOMER_NAME AS CST " _
+        & "FROM CAL_Account_Assignments " _
+        & "WHERE T1_ID " & operator & " '" & Get_ID & "' " _
+        & "ORDER BY CUSTOMER_NAME", cnn
+
+    'Assemble string from query results
+    If Not rst.EOF Then
+        ret_val = rst.GetString(, , , "|")
+
+        'Return Array of assigned customer names
+        Get_Customers = Split(ret_val, "|")
+    End If
+End Function
+
+
+'*******************************************************************************
+'Query customer packet. Parameter is SQL string of customer names. Returns
+'array of customer packets.
+'*******************************************************************************
+Function Get_Packet(customers) As Variant
+
+    'Declare function variables
+    Dim cnn As New ADODB.Connection
+    Dim rst As New ADODB.Recordset
+    Dim packet As String
+
+    'Establish connection to SQL server
+    cnn.Open ado.sql_server
+    
+    'Query all assigned customer names
+    rst.Open "SELECT DISTINCT UPPER(PACKET) AS PACKET " _
+        & "FROM CAL_Customer_Profile " _
+        & "WHERE CUSTOMER IN (" & customers & ")" _
+        & "AND PACKET IS NOT NULL " _
+        & "AND PACKET <> ''", cnn
+
+    'Assemble string from query results
+    If Not rst.EOF Then Get_Packet = "'" & rst.GetString(, , , "','") & "'"
+End Function
+
+
+'*******************************************************************************
+'Query all account assignments & customer data.
+'*******************************************************************************
+Function Get_All_Account_Assignments() As ADODB.Recordset
+
+    'Declare function variables
+    Dim cnn As New ADODB.Connection
+    Dim rst As New ADODB.Recordset
+    
+    'Establish connection to SQL server
+    cnn.Open ado.sql_server
+
+    'Query account assignment form
+    rst.Open "SELECT " _
+        & "CUSTOMER_NAME, " _
+        & "TEAM_LEAD, " _
+        & "TIER_1, " _
+        & "TIER_2, " _
+        & "TIER_3, " _
+        & "ALT_NAME, " _
+        & "ASS_NOTES, " _
+        & "GPO, " _
+        & "GPO_TIE," _
+        & "PACKET, " _
+        & "PROGRAM_COUNT, " _
+        & "NID, " _
+        & "CUST_TYPE, " _
+        & "WEEKLY, " _
+        & "WEEKLY_COUNT, " _
+        & "LEAD_HOUSE, " _
+        & "NOTES " _
+        & "FROM CAL_Account_Assignments", cnn
+
+    'Return recordset of account assignment data
+    Set Get_All_Account_Assignments = rst
+End Function
+
+
+Function Confirm_Unassigned(customers) As Variant
+
+    Dim cnn As New ADODB.Connection
+    Dim rst As New ADODB.Recordset
+    Dim ret_val As String
+    
+    cnn.Open ado.this_workbook
+    
+    rst.Open "SELECT [UNASSIGNED] FROM [" & CAL.DropDown_Sheet & "$] WHERE [UNASSIGNED] IN (" & customers & ")", cnn
+    
+    ret_val = rst.GetString(, , , "|")
+    
+    Confirm_Unassigned = Split(ret_val, "|")
+End Function
+
+
+'*******************************************************************************
+'Query all acount assignments given network ID(s).
+'*******************************************************************************
+Function Get_Account_Assignments(users) As Variant
+
+    'Declare function variables
+    Dim cnn As New ADODB.Connection
+    Dim rst As New ADODB.Recordset
+    Dim ret_val As Variant
+
+    'Establish connection to SQL server
+    cnn.Open ado.sql_server
+
+    'Query all assigned customer names
+    rst.Open "SELECT DISTINCT CUSTOMER_NAME AS CST " _
+        & "FROM CAL_Account_Assignments " _
+        & "WHERE TIER_1 IN (" & users & ")", cnn
+
+   ret_val = Confirm_Unassigned("'" & rst.GetString(, , , "','") & "'")
+
+    'Return Array of assigned customer names
+    Get_Account_Assignments = ret_val
+End Function
+
+
+'*******************************************************************************
+'Query T2 customer names. Parameter is user's network ID. Returns
+'array of customer names
+'*******************************************************************************
+Function Get_T2_Assignments() As Variant
+
+    'Declare function variables
+    Dim cnn As New ADODB.Connection
+    Dim rst As New ADODB.Recordset
+    Dim ret_val As Variant
+
+    'Establish connection to SQL server
+    cnn.Open ado.sql_server
+
+    'Query all assigned customer names
+    rst.Open "SELECT CUSTOMER_NAME AS CST " _
+        & "FROM CAL_Account_Assignments " _
+        & "WHERE T2_ID = '" & Environ("Username") & "' " _
+        & "ORDER BY CUSTOMER_NAME", cnn
+
+    'Assemble string from query results
+    If Not rst.EOF Then ret_val = Confirm_Unassigned("'" & rst.GetString(, , , "','") & "'")
+
+    'Return Array of assigned customer names
+    Get_T2_Assignments = ret_val
+End Function
+
+
+'*******************************************************************************
+'Return multidimensional array of Excel sheet data.
+'*******************************************************************************
+Public Function Get_Excel_Recordset(sheet_name As String) As ADODB.Recordset
+
+    'Declare function variables
+    Dim rst As New ADODB.Recordset
+    Dim cnn As String
+
+    'Save connection string (connection to CAL workbook)
+    cnn = ado.this_workbook
+
+    'Query file (from passthrough sheet) and return results in an open recordset
+    rst.Open "SELECT * FROM [" & sheet_name & "$]", cnn
+    
+    'Return multidimensional array of Excel data (from passthrough sheet)
+    Set Get_Excel_Recordset = rst
+End Function
+
+
+'*******************************************************************************
+'Pull all accoiate names (excluding user's name).
+'*******************************************************************************
+Function Get_Associate_Name() As Variant
+
+    'Declare function variables
+    Dim cnn As New ADODB.Connection
+    Dim rst As New ADODB.Recordset
+    Dim ret_val As String
+
+    'Establish connection to SQL server
+    cnn.Open ado.sql_server
+
+    'Query customer ID from customer name
+    rst.Open "SELECT DISTINCT TIER_1 AS ASS " _
+        & "FROM CAL_Account_Assignments " _
+        & "WHERE T1_ID <> '" & Get_ID & "' " _
+        & "AND TIER_1 <> '' " _
+        & "ORDER BY TIER_1 ASC", cnn
+
+    'Assemble string from query results
+    If Not rst.EOF Then ret_val = rst.GetString(, , , "|")
+
+    'Return Array of associate names
+    Get_Associate_Name = Split(ret_val, "|")
+End Function
+
+
+'*******************************************************************************
+'Pull all accoiate names (excluding user's name).
+'*******************************************************************************
+Function Get_GPO_Customers() As Variant
+
+    'Declare function variables
+    Dim cnn As New ADODB.Connection
+    Dim rst As New ADODB.Recordset
+    Dim ret_val As String
+
+    cnn.Open ado.this_workbook
+    rst.Open "SELECT [ASSIGNED] FROM [" & CAL.DropDown_Sheet & "$]", cnn
+    
+    If Not rst.EOF Then
+    
+        ret_val = "'" & rst.GetString(, , , "','") & "'"
+        cnn.Close
+        Set cnn = Nothing
+        
+        'Establish connection to SQL server
+        cnn.Open ado.sql_server
+    
+        'Query customer ID from customer name
+        rst.Open "SELECT CUSTOMER_NAME AS CST " _
+            & "FROM CAL_Account_Assignments " _
+            & "WHERE CUSTOMER_NAME IN (" & ret_val & ") " _
+            & "AND GPO = 'Y' ", cnn
+            
+        If Not rst.EOF Then
+            ret_val = rst.GetString(, , , "|")
+        Else
+            ret_val = ""
+        End If
+    End If
+        
+    'Return 2d array from recordset value
+    If ret_val <> "" Then Get_GPO_Customers = Split(ret_val, "|")
+End Function
+
+
+'*******************************************************************************
+'Pull all accoiate names (excluding user's name).
+'*******************************************************************************
+Function Get_Associate_ID(associate_name) As Variant
+
+    'Declare function variables
+    Dim cnn As New ADODB.Connection
+    Dim rst As New ADODB.Recordset
+    Dim ret_val As String
+
+    'Establish connection to SQL server
+    cnn.Open ado.sql_server
+    'Query customer ID from customer name
+    rst.Open "SELECT DISTINCT T1_ID AS ID " _
+        & "FROM CAL_Account_Assignments " _
+        & "WHERE TIER_1 IN (" & associate_name & ")", cnn
+
+    'Assemble string from query results
+    Do While rst.EOF = False
+        ret_val = Append(ret_val, "|", rst.fields("ID").Value)
+        rst.MoveNext
+    Loop
+
+    'Return Array of associate names
+    Get_Associate_ID = Split(ret_val, "|")
+End Function
+
+
+'*******************************************************************************
+'Return all OpCo sites given list of Packets.
+'*******************************************************************************
+Function Get_OpCo_List(packet) As Variant
+
+    'Declare function variables
+    Dim cnn As New ADODB.Connection
+    Dim rst As New ADODB.Recordset
+
+    cnn.Open ado.SUS("240")
+
+    'Query OpCo list for each packet
+    rst.Open "SELECT DISTINCT TRIM(DVPKGS) AS PCKT, TRIM(DVT500) AS OP " _
+        & "FROM SCDBFP10.PMDPDVRF " _
+        & "INNER JOIN (" _
+            & "SELECT DVPKGS AS PACKET, MAX(LENGTH(TRIM(DVT500))) AS LEN " _
+            & "FROM SCDBFP10.PMDPDVRF " _
+            & "WHERE TRIM(DVPKGS) IN (" & packet & ") " _
+            & "GROUP BY DVPKGS) " _
+        & "ON DVPKGS = PACKET AND LENGTH(TRIM(DVT500)) = LEN ", cnn
+
+    'Return multidimensional of packet data
+    Get_OpCo_List = rst.GetRows
+
+End Function
+
+
+'*******************************************************************************
+'Return recordset of all items that are coded to strMPC
+'*******************************************************************************
+Function CodeItem(MPC, GTIN) As ADODB.Recordset
+
+    'Declare function variables
+    Dim cnn As New ADODB.Connection
+    Dim rst As New ADODB.Recordset
+
+    'Get username and password
+    cnn.Open ado.SUS(240)
+    
+    'Turn off connection timeout
+    cnn.CommandTimeout = 0
+    
+    'Set invalid characters if either GTIN or MPC is blank
+    If MPC = "''" Then MPC = "'01111000'"
+    If GTIN = "''" Then GTIN = "'01111000'"
+    
+    'Query for SUPC using GTIN
+    rst.Open "SELECT DISTINCT TRIM(JFITEM), " _
+        & "TRIM(JFPACK) || '/' || TRIM(JFITSZ), " _
+        & "TRIM(JFBRND), TRIM(JFITDS), TRIM(JFMNPC), JFEUPC, JFLCCT, TRIM(JFVNBR), TRIM(A2VNNM), " _
+        & "CASE WHEN JFITST = 'A' THEN 'ACTIVE' ELSE 'INACTIVE' END " _
+        & "FROM SCDBFP10.USIAJFPF " _
+        & "LEFT JOIN SCDBFP10.USVBA2PF " _
+        & "ON JFVNBR = A2VNBR " _
+        & "WHERE JFEUPC IN (" & GTIN & ") " _
+        & "OR TRIM(JFMNPC) IN (" & MPC & ")", cnn
+
+    'Return multidimensional of packet data
+    Set CodeItem = rst
+
+End Function
+
+
+'*******************************************************************************
+'Get associate SUS password
+'*******************************************************************************
+Function get_password() As String
+
+    'Declare function variables
+    Dim cnn As New ADODB.Connection
+    Dim rst As New ADODB.Recordset
+    Dim i       As Integer
+    Dim decrypted_password  As String
+    Dim encrypted_password  As String
+    Dim decryption_key  As String
+
+    'Establish connection to SQL server
+    cnn.Open ado.sql_server
+
+    'Query uid & password
+    rst.Open "SELECT SUS_PWD, CRED_ID " _
+        & "FROM Login_Cred " _
+        & "WHERE NET_ID = '" & Get_ID & "'", cnn
+
+    'If records were successfully queried
+    If Not rst.EOF Then
+
+        'save value to string
+        encrypted_password = rst.fields("SUS_PWD").Value
+        decryption_key = rst.fields("CRED_ID").Value
+
+        'Loop through each character in password
+        For i = 1 To Len(encrypted_password)
+
+            'Decrypt character of password
+            decrypted_password = decrypted_password & Chr(Asc(Mid(encrypted_password, i, 1)) - Mid(decryption_key, i, 1))
+        Next
+
+        'Return decryted SUS password
+        get_password = decrypted_password
+    End If
+End Function
+
+
+'*******************************************************************************
+'Get associate SUS username
+'*******************************************************************************
+Function Get_Login_ID() As String
+
+    'Declare function variables
+    Dim cnn As New ADODB.Connection
+    Dim rst As New ADODB.Recordset
+
+    'Establish connection to SQL server
+    cnn.Open ado.sql_server
+
+    'Query uid & password
+    rst.Open "SELECT SUS_ID AS ID " _
+        & "FROM Login_Cred " _
+        & "WHERE NET_ID = '" & Get_ID & "'", cnn
+
+    'If records were successfully queried return SUS ID
+    If Not rst.EOF Then Get_Login_ID = rst.fields("ID").Value
+End Function
+
+'*******************************************************************************
+'Generate a report which validates all CAs created by user *today have
+'been downloaded.
+'*******************************************************************************
+Function Get_Download_Error_CA() As ADODB.Recordset
+
+    'Declare function variables
+    Dim cnn As New ADODB.Connection
+    Dim rst As New ADODB.Recordset
+    Dim create_date As String
+
+    'Connect to OpCo
+    cnn.Open ado.SUS("240")
+    
+    'Get todays date in SUS format
+    create_date = Format(Now(), "YYYYMMDD")
+
+    'Query all agreements created today with download errors
+    rst.Open "SELECT DISTINCT 'CA', NHCANO, NHCADC, NHCASD, NHCAED, NHEADT, " _
+        & "CASE " _
+            & "WHEN DVCPTY IS NULL THEN 'AGREEMENT NOT ADDED TO PACKET' " _
+            & "WHEN DVLTDT = 0 THEN 'AGREEMENT NOT DISTRIBUTED' " _
+            & "ELSE 'NO ERROR' " _
+        & "END " _
+        & "FROM SCDBFP10.PMPVNHPF " _
+        & "LEFT JOIN SCDBFP10.PMDPDVRF " _
+        & "ON NHCANO = DVCPM9 AND 'CA ' = DVCPTY " _
+        & "WHERE TRIM(NHEAID) = '" & Get_Login_ID & "' " _
+        & "AND NHEADT = " & create_date & " " _
+        & "AND NHCVAN = 0", cnn
+        
+    'If records were found, return whole recordset
+    Set Get_Download_Error_CA = rst
+
+End Function
+
+
+'*******************************************************************************
+'Generate a report which validates all VAs created by user *today have
+'been downloaded.
+'*******************************************************************************
+Function Get_Download_Error_VA() As ADODB.Recordset
+
+    'Declare function variables
+    Dim cnn As New ADODB.Connection
+    Dim rst As New ADODB.Recordset
+    Dim create_date As String
+    
+    'Connect to OpCo
+    cnn.Open ado.SUS("240")
+    
+    'Get todays date in SUS format
+    create_date = Format(Now(), "yyyymmdd")
+
+    'Query all agreements created today with download errors
+    rst.Open "SELECT DISTINCT 'VA', M7VAGN, M7VAGD, M7VASD, M7VAED, M7EADT, " _
+        & "CASE " _
+            & "WHEN DVCPTY IS NULL THEN 'AGREEMENT NOT ADDED TO PACKET' " _
+            & "WHEN DVLTDT = 0 THEN 'AGREEMENT NOT DISTRIBUTED' " _
+            & "ELSE 'NO ERROR' " _
+        & "END " _
+        & "FROM SCDBFP10.PMVHM7PF " _
+        & "LEFT JOIN SCDBFP10.PMDPDVRF " _
+        & "ON M7VAGN = DVCPM9 AND 'VA ' = DVCPTY " _
+        & "WHERE TRIM(M7EAID) = '" & strUid & "' " _
+        & "AND M7EADT = " & create_date, cnn
+        
+    'If records were found, return whole recordset
+    Set Get_Download_Error_VA = rst
+End Function
+
+
+'*******************************************************************************
+'Generate a dictionary of key:= excel row number & Item:= array of customer
+'eligibility.
+'*******************************************************************************
+Function Get_Eligibility(VA As String, CA As String) As ADODB.Recordset
+    
+    'Declare function variables
+    Dim cnn As New ADODB.Connection
+    Dim rst As New ADODB.Recordset
+    
+    'Connect to OpCo
+    cnn.Open ado.SUS("240")
+    
+    'Query all customer eligibility for list of agreements
+    rst.Open "SELECT DISTINCT TRIM(AZPCIE), AZPCSC, TRIM(AZPCSP), " _
+        & "CASE WHEN JNPTDS IS NULL THEN " _
+            & "TRIM(JUGRPD) " _
+        & "ELSE " _
+            & "TRIM(JNPTDS) " _
+        & "END " _
+        & "FROM SCDBFP10.USCNAZPF " _
+        & "LEFT JOIN SCDBFP10.USCAJNPF ON AZPCSP = JNPCNO " _
+        & "LEFT JOIN SCDBFP10.USCLJUPF ON AZPCSP = JUCEEN " _
+        & "LEFT JOIN SCDBFP10.PMVHM7PF " _
+        & "ON AZCEEN = M7VAGN AND AZCEAI = 'VA ' " _
+        & "AND (AZEFED = M7VAED OR AZPCIE = 'E') " _
+        & "LEFT JOIN SCDBFP10.PMPVNHPF " _
+        & "ON AZCEEN = NHCANO AND AZCEAI = 'CA ' " _
+        & "AND (AZEFED = NHCAED OR AZPCIE = 'E') " _
+        & "WHERE (M7VAGN <> 0 OR NHCANO <> 0) " _
+        & "AND ((AZCEEN IN (" & CA & ") AND AZCEAI = 'CA ') " _
+        & "OR (AZCEEN IN (" & VA & ") AND AZCEAI = 'VA '))", cnn
+    
+    'Return dictionary
+    Set Get_Eligibility = rst
+End Function
+
+
+'*******************************************************************************
+'Generate a dictionary of key:= excel row number & Item:= array of customer
+'eligibility.
+'*******************************************************************************
+Function Get_SUS_Name() As String
+    
+    'Declare function variables
+    Dim cnn As New ADODB.Connection
+    Dim rst As New ADODB.Recordset
+    
+    'Connect to OpCo
+    cnn.Open ado.SUS("240")
+    
+    'Query all customer eligibility for list of agreements
+    rst.Open "SELECT TRIM(O4FRST) || ' ' || TRIM(O4LAST) AS NAME " _
+        & "FROM SCDBFP10.SYDBO4PF " _
+        & "WHERE O4USER = '" & UCase(Get_Login_ID) & "'", cnn
+  
+    'Return dictionary
+    Get_SUS_Name = rst.fields("NAME").Value
+End Function
+
+
+'*******************************************************************************
+'Generate a dictionary of key:= excel row number & Item:= array of customer
+'eligibility.
+'*******************************************************************************
+Function Get_Matrix(VA As String, CA As String, _
+    matrix_dictionary As Scripting.Dictionary) As Scripting.Dictionary
+    
+    'Declare function variables
+    Dim cnn As New ADODB.Connection
+    Dim rst As New ADODB.Recordset
+    Dim temporary_dictionary As New Scripting.Dictionary
+    Dim customer As String
+    Dim agreement As String
+    
+    'Get username and password
+    cnn.Open ado.SUS("240")
+    
+    'Query all customer eligibility for list of agreements
+    rst.Open "SELECT CAST(AZCEEN AS INT) AS AGREEMENT, " _
+        & "CASE WHEN JUGRPD IS NOT NULL THEN " _
+            & "TRIM(JUGRPD) || '" & vbLf & "(' || TRIM(AZPCSP) || ')' " _
+        & "WHEN JNPTDS IS NOT NULL THEN " _
+            & "TRIM(JNPTDS) || '" & vbLf & "(' || TRIM(AZPCSP) || ')' " _
+        & "ELSE " _
+            & "'UNNAMED" & vbLf & "(' || TRIM(AZPCSP) || ')' " _
+        & "END AS CUSTOMER " _
+        & "FROM SCDBFP10.USCNAZPF " _
+        & "LEFT JOIN SCDBFP10.USCAJNPF ON AZPCSP = JNPCNO " _
+        & "LEFT JOIN SCDBFP10.USCLJUPF ON AZPCSP = JUCEEN " _
+        & "LEFT JOIN SCDBFP10.PMVHM7PF " _
+        & "ON AZCEEN = M7VAGN AND AZCEAI = 'VA ' " _
+        & "AND (AZEFED = M7VAED OR AZPCIE = 'E') " _
+        & "LEFT JOIN SCDBFP10.PMPVNHPF " _
+        & "ON AZCEEN = NHCANO AND AZCEAI = 'CA ' " _
+        & "AND (AZEFED = NHCAED OR AZPCIE = 'E') " _
+        & "WHERE (M7VAGN <> 0 OR NHCANO <> 0) " _
+        & "AND ((AZCEEN IN (" & CA & ") AND AZCEAI = 'CA ') " _
+        & "OR (AZCEEN IN (" & VA & ") AND AZCEAI = 'VA ')) " _
+        & "ORDER BY CUSTOMER", cnn
+        
+    'Loop through records and add to dictionary
+    Do While Not rst.EOF
+        
+        'Get values from recordset line
+        customer = rst.fields("CUSTOMER").Value
+        agreement = rst.fields("AGREEMENT").Value
+        
+        'Add items to dictionary with customer name as Key and all eligible agreements as comma delimited string
+        temporary_dictionary(customer) = Append(temporary_dictionary(customer), "|", matrix_dictionary(agreement))
+
+        'Iterate recordste
+        rst.MoveNext
+    Loop
+    
+    'Return dictionary
+    Set Get_Matrix = temporary_dictionary
+End Function
+
+

@@ -1,0 +1,170 @@
+Attribute VB_Name = "Install_Path"
+
+
+'*******************************************************************************
+'Function to determine if file path is in correct location. Returns boolean.
+'*******************************************************************************
+Function CorrectPath() As Boolean
+
+    'Declare function variables
+    Dim strThisPth As String
+    Dim strRightPth As String
+    
+    'Set path strings (as upper case, just in case)
+    strThisPth = UCase(ThisWorkbook.Path)
+    strRightPth = UCase("C:\Users\" & Environ("Username") & "\CAL")
+    
+    'If workbook is saved to the correct path
+    If strThisPth = strRightPth Then CorrectPath = True
+End Function
+
+
+'*******************************************************************************
+'Move file to correct location in the C: drive. Also create desktop shortcut
+'and assign custom icon to shortcut.
+'*******************************************************************************
+Sub Install_CAL()
+
+    'Declare sub variables
+    Dim fso As New FileSystemObject
+    Dim strPth As String
+    
+    'Set file path to string variables
+    strPth = "C:\Users\" & Environ("Username") & "\CAL"
+    
+    'Create install directory if install path CAL folder does not exist
+    If Dir(strPth, vbDirectory) = "" Then
+        MkDir strPth
+        MkDir strPth & "\Packages"
+    End If
+    
+    'Export Icon to local drive & update userform
+    Create_Icon strPth & "\Packages\Icon.ico"
+    InstallNotice.Icon.Picture = LoadPicture(strPth & "\Packages\Icon.ico")
+    
+    'Disable on-event macros and bypass 'are you sure' prompt
+    Application.EnableEvents = False
+    Application.DisplayAlerts = False
+    
+    'Save workbook to correct local path
+    ThisWorkbook.SaveAs strPth & "\CAL.xlsm"
+
+    'Re-enable on-event macros and restore alters
+    Application.DisplayAlerts = True
+    Application.EnableEvents = True
+    
+    'Add shortcut desktop
+    Create_Shortcut strPth & "\Packages\Icon.ico"
+End Sub
+
+
+'*******************************************************************************
+'Create desktop shortcut for CAL. Given the icon filepath, set custom icon for
+'CAL shortcut.
+'*******************************************************************************
+Sub Create_Shortcut(strIcnPth As String)
+
+    'Declare sub variables
+    Dim oWsh As Object
+    Dim oShrtCt As Object
+    Dim strPth As String
+    
+    'Setup vb Script shell object
+    Set oWsh = CreateObject("WScript.Shell")
+    
+    'Find user desktop folder using vb Script function & set shortcut path
+    strPth = oWsh.SpecialFolders("Desktop") & "\CAL.lnk"
+    
+    'Create destop shortcut and save to object
+    Set oShrtCt = oWsh.CreateShortcut(strPth)
+    
+    'Link shortcut to this file
+    With oShrtCt
+        .TargetPath = ThisWorkbook.FullName
+        .IconLocation = strIcnPth
+        .Save
+    End With
+End Sub
+
+
+'*******************************************************************************
+'Take bytemap from Icon_Bytes sheet to create icon image & save to C: directory.
+'*******************************************************************************
+Sub Create_Icon(ByVal GifFile As String)
+
+    'Declare sub variables
+    Dim Bytes() As Byte
+    Dim FileNum As Integer
+    Dim var() As Variant
+    Dim X As Long
+    
+    var = ThisWorkbook.Worksheets("Icon_Bytes (Utility)").UsedRange.Value
+     
+    ReDim Bytes(LBound(var) To UBound(var))
+    For X = LBound(var) To UBound(var)
+        Bytes(X) = CByte(var(X, 1))
+    Next
+    
+    FileNum = FreeFile
+    Open GifFile For Binary As #FileNum
+        Put #FileNum, 1, Bytes
+    Close FileNum
+    
+End Sub
+
+
+'*******************************************************************************
+'Check if file is in appropriate file location. If not, ask user if they would
+'like to install* (Install_CAL) and take appropriate action if yes. If no,
+'close CAL.
+'*******************************************************************************
+Sub Validate()
+
+    'Declare sub variables
+    Dim bl As Boolean
+    Dim iyn As Integer
+    
+    'Determine if current filepath is correct local file path
+    If Dir("U:\Documents", vbDirectory) = "" Then
+        bl = CorrectPath
+    Else
+        bl = True
+    End If
+    
+    'If current file path is not correct local file path
+    If bl = False Then
+    
+        'Get current path of workbook
+        strOldPth = ThisWorkbook.FullName
+    
+        'Alert user that CAL needs to be installed* and prompt them y/n
+        iyn = MsgBox("This appears to be your first time opening CAL (5.0)." & vbLf _
+        & "Most CAL features are disabled " _
+        & "until it is installed on your machine." & vbLf & vbLf _
+        & "Would you like to install now?", _
+        vbExclamation + vbYesNo + vbDefaultButton1, "CAL Not Installed")
+    
+        'If user elected to install* CAl
+        If iyn = 6 Then
+        
+            'Install CAL and create custom shortcut
+            Install_CAL
+            
+            'Alert user of changes
+            InstallNotice.Show
+            
+        'If user elected not to install* CAl
+        Else
+        
+            'Close CAl
+            ThisWorkbook.Close SaveChanges:=False
+        End If
+    End If
+End Sub
+
+
+
+
+
+    
+

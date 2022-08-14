@@ -1,0 +1,277 @@
+Attribute VB_Name = "Record_Management"
+
+'Private variables for module functions
+Private cnn_xl As New ADODB.Connection
+Private cnn_sql As New ADODB.Connection
+Private ado As New AdoConnection
+Private obj As Object
+Private changes As Boolean
+
+
+'*******************************************************************************
+'Push insert records to sql server and return inserted primary key.
+'*******************************************************************************
+Function Push_Records(records As ADODB.Recordset) As String
+
+    Dim rst As New ADODB.Recordset
+    Dim ret_val As String
+    Dim line_val As String
+    Dim i As Integer
+
+    'Loop through each value in recorset
+    Do While Not records.EOF
+    
+        'Add primary key to string for deletion
+        If Not IsNull(records(0).Value) Then _
+            ret_val = Append(ret_val, ",", records(0).Value)
+
+        'Assemble string of each value in iteration of recordset
+        line_val = "'" & records(1).Value & "'"
+        For i = 2 To records.fields.Count - 1
+            line_val = line_val & ",'" & records(i).Value & "'"
+        Next
+
+        'Insert new lines and return specified gutter fields
+        rst.Open "INSERT INTO " & obj.tbl & " " _
+            & "OUTPUT INSERTED.PRIMARY_KEY, CONCAT(INSERTED.CUSTOMER, INSERTED." & obj.Unique_Sql_Col & ") " _
+            & "VALUES(" & line_val & ")", cnn_sql
+            
+        'Update CAL with primary key that was just created upon insert
+        cnn_xl.Execute "UPDATE [" & obj.Sht & "$] " _
+            & "SET [PRIMARY_KEY] = " & rst(0).Value & " " _
+            & "WHERE [CUSTOMER] & " & obj.Unique_Sht_Col & " = '" & rst(1).Value & "'"
+
+        'Close ret_val recordset and iterate rst recordset
+        rst.Close
+        records.MoveNext
+    Loop
+    
+    Push_Records = ret_val
+End Function
+
+
+'*******************************************************************************
+'Insert new records into table
+'*******************************************************************************
+Sub Proc_Insert()
+
+    'Declare sub variables
+    Dim rst As New ADODB.Recordset
+
+    'Proceed only if records exist on CAl tab
+    If Sheets(obj.Sht).UsedRange.Rows.Count > 1 Then
+    
+        'Get new lines from programs tab
+        rst.Open "SELECT T1.[PRIMARY_KEY], " & obj.Return_Val _
+            & "FROM [" & obj.Sht & "$] AS T1 " _
+            & "LEFT JOIN [" & obj.Save_Sht & "$] AS T2 " _
+            & "ON (T1.[PRIMARY_KEY] = T2.[PRIMARY_KEY]) " _
+            & "WHERE T2.[PRIMARY_KEY] IS NULL " _
+            & "AND T1.[CUSTOMER] IS NOT NULL", cnn_xl
+            
+        'Update change flag and push records if changes were made
+        If Not rst.EOF Then
+            changes = True
+            ret_val = Push_Records(rst)
+        End If
+    End If
+End Sub
+
+
+'*******************************************************************************
+'Update lines from Excel to SQL server.
+'*******************************************************************************
+Sub Proc_Update()
+
+    'Declare sub variables
+    Dim rst As New ADODB.Recordset
+    Dim tbl_col1 As Variant
+    Dim tbl_col2 As Variant
+    Dim tbl_comp As String
+    Dim ret_val As String
+    
+    'Only proceed if records exist on CAL tab
+    If Sheets(obj.Sht).UsedRange.Rows.Count > 1 Then
+    
+        'Create comparision strings
+        tbl_col1 = Split(Replace(obj.Tbl_Columns, "*", "T1."), "&")
+        tbl_col2 = Split(Replace(obj.Tbl_Columns, "*", "T2."), "&")
+        tbl_comp = "(" & tbl_col1(0) & "<> " & tbl_col2(0)
+        For i = 1 To UBound(tbl_col1)
+            tbl_comp = tbl_comp & " OR " & tbl_col1(i) & "<> " & tbl_col2(i)
+        Next
+        tbl_comp = tbl_comp & ") "
+        
+        'Get new lines from programs tab
+        rst.Open "SELECT T1.[PRIMARY_KEY], " & obj.Return_Val & " " _
+            & "FROM [" & obj.Sht & "$] AS T1 " _
+            & "INNER JOIN [" & obj.Save_Sht & "$] AS T2 " _
+            & "ON (T1.[PRIMARY_KEY] = T2.[PRIMARY_KEY]) " _
+            & "WHERE " & tbl_comp _
+            & "AND T1.[CUSTOMER] IS NOT NULL", cnn_xl
+            
+        'Update change flag and push records if changes were made
+        If Not rst.EOF Then
+            changes = True
+            ret_val = Push_Records(rst)
+            cnn_sql.Execute "DELETE " _
+                & "FROM " & obj.tbl & " " _
+                & "WHERE PRIMARY_KEY IN (" & ret_val & ")"
+        End If
+    End If
+End Sub
+
+
+'*******************************************************************************
+'Delete records from table and insert row into recovery tables.
+'*******************************************************************************
+Sub Proc_Delete()
+
+    'Declare sub variables
+    Dim delete_val As String
+    Dim rst As New ADODB.Recordset
+    
+    'Query records deleted from worksheet
+    If Sheets(obj.Sht).UsedRange.Rows.Count = 1 Then
+        rst.Open "SELECT [PRIMARY_KEY] FROM [" & obj.Save_Sht & "$]", cnn_xl
+    Else
+        rst.Open "SELECT T1.[PRIMARY_KEY] " _
+            & "FROM [" & obj.Save_Sht & "$] AS T1 " _
+            & "LEFT JOIN [" & obj.Sht & "$] AS T2 " _
+            & "ON (T1.[PRIMARY_KEY] = T2.[PRIMARY_KEY]) " _
+            & "WHERE T2.[PRIMARY_KEY] IS NULL", cnn_xl
+    End If
+        
+    'If there are records to delete
+    If Not rst.EOF Then
+    
+        'Update change flag
+        changes = True
+  
+        'Get string of values to delete
+        delete_val = rst.GetString(, , , ",")
+        If Right(delete_val, 1) = "," Then _
+            delete_val = Left(delete_val, Len(delete_val) - 1)
+
+        'Insert deleted records into recovery table
+        cnn_sql.Execute "INSERT INTO " & obj.Tbl_Archive _
+            & "SELECT " & obj.Sql_Columns & ", '" & Get_Name & "' " _
+            & "FROM " & obj.tbl & " " _
+            & "WHERE PRIMARY_KEY IN (" & delete_val & ")"
+
+        'Delete records from primary table
+        cnn_sql.Execute "DELETE " _
+            & "FROM " & obj.tbl & " " _
+            & "WHERE PRIMARY_KEY IN (" & delete_val & ")"
+    End If
+End Sub
+
+
+'*******************************************************************************
+'Refresh hidden comparison sheets.
+'*******************************************************************************
+Sub Proc_Refresh()
+
+    'Clear existing sheet data
+    Clear_Sheets obj.Save_Sht
+    
+    'Paste class sheet data to class background save sheet
+    Sheets(obj.Save_Sht).Range("A2").CopyFromRecordset _
+        Pull.Get_Excel_Recordset(obj.Sht)
+
+End Sub
+
+
+'*******************************************************************************
+'Open connections to sql server and CAL workbook.
+'*******************************************************************************
+Sub Proc_Connect()
+
+    'Open conncetions to Workbook and sql server
+    cnn_xl.Open ado.this_workbook
+    cnn_sql.Open ado.sql_server
+End Sub
+
+
+'*******************************************************************************
+'Close connections to sql server and CAL workbook.
+'*******************************************************************************
+Sub Proc_Disconnect()
+
+    'Close connections to workbook and sql server
+    If cnn_xl.State = 1 Then cnn_xl.Close
+    If cnn_sql.State = 1 Then cnn_sql.Close
+End Sub
+
+
+'*******************************************************************************
+'Sync all changes made on worksheet to sql server.
+'*******************************************************************************
+Sub Sync()
+
+    'Declare sub variables
+    Dim programs As New CAL_Programs
+    Dim customer_profile As New CAL_Customer_Profile
+    Dim deviation_loads As New CAL_Deviation_Loads
+    Dim tab_objects As Variant
+    Dim var As Variant
+    
+    'Display loading popup
+    Loading.Show 0
+    DoEvents
+    
+    'Freeze screen updating and event triggering
+    Application.ScreenUpdating = False
+    Application.EnableEvents = False
+    
+    'Configure Error Handling
+    On Error GoTo ErrHandling
+    
+    'Open connections to workbook and sql server
+    Proc_Connect
+    
+    'setup array of CAL sheet objects
+    tab_objects = Array(programs, customer_profile, deviation_loads)
+    
+    'Loop through each object in CAL sheet objects
+    For Each var In tab_objects
+
+        'Setup object and reset change tracker
+        Set obj = var
+        changes = False
+        
+        'Clear special characters from object sheet
+        Sheets(obj.Sht).Cells.Replace "'", ""
+    
+        'Send CAL updates to server
+        Proc_Delete
+        Proc_Insert
+        Proc_Update
+        
+        'Update background sheet if changes were made
+        If changes Then Proc_Refresh
+    Next
+    
+ResetSettings:
+    'Close connections to workbook and sql server
+    Proc_Disconnect
+    
+    'Reset settings (screen updating/event handling)
+    Application.ScreenUpdating = True
+    Application.EnableEvents = True
+    
+    'Close loading popup and exit sub
+    Unload Loading
+    Exit Sub
+    
+ErrHandling:
+    'Alert user of error and reset all settings
+    MsgBox "Updates could not be saved. Please be sure that all cells comply with the below requirements: " & vbLf & vbLf _
+        & Chr(149) & " Records contain less than 255 characters." & vbLf _
+        & Chr(149) & " Updates are made within the defined data range." & vbLf & vbLf _
+        & Err.Description, vbExclamation
+        
+    GoTo ResetSettings
+
+End Sub
+
